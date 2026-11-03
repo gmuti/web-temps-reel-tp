@@ -80,6 +80,7 @@ describe('Plan de salle (e2e)', () => {
         { number: 1, x: -6, z: -1, shape: 'small', seats: 2 },
         { number: 7, x: 0, z: 2, shape: 'long', seats: 4 },
       ],
+      version: 0,
     });
   });
 
@@ -89,7 +90,7 @@ describe('Plan de salle (e2e)', () => {
       .get('/floor-plan')
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
-    expect(response.body).toEqual({ tables: [] });
+    expect(response.body).toEqual({ tables: [], version: 0 });
   });
 
   it('GET /floor-plan exige une authentification', async () => {

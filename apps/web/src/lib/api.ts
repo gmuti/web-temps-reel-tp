@@ -6,17 +6,21 @@ import {
   type Dish,
   type FloorPlan,
   type LoginInput,
+  type UpdateFloorPlanRequest,
 } from '@app/shared'
 
 export const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
 
 export class ApiError extends Error {
   status: number
+  // Code d'erreur métier renvoyé par l'API (ex. FLOOR_PLAN_CONFLICT), s'il y en a un.
+  errorCode: string | undefined
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, errorCode?: string) {
     super(message)
     this.name = 'ApiError'
     this.status = status
+    this.errorCode = errorCode
   }
 }
 
@@ -41,7 +45,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const message = Array.isArray(body?.message)
       ? body.message.map((issue: { path?: string; message: string }) => issue.message).join(', ')
       : (body?.message ?? response.statusText)
-    throw new ApiError(response.status, message)
+    throw new ApiError(response.status, message, body?.errorCode)
   }
 
   if (response.status === 204) {
@@ -65,5 +69,10 @@ export async function getDishes(): Promise<Dish[]> {
 
 export async function getFloorPlan(): Promise<FloorPlan> {
   const data = await request<unknown>('/floor-plan')
+  return floorPlanSchema.parse(data)
+}
+
+export async function saveFloorPlan(input: UpdateFloorPlanRequest): Promise<FloorPlan> {
+  const data = await request<unknown>('/floor-plan', { method: 'PUT', body: JSON.stringify(input) })
   return floorPlanSchema.parse(data)
 }

@@ -1,16 +1,16 @@
-import type {
-  ChatAuthor,
-  FloorTable,
-  Order,
-  OrderJournalEvent,
-  TableState,
-  TableStatusUpdatedEvent,
-  UserRole,
+import {
+  canRoleEditFloorPlan,
+  type ChatAuthor,
+  type FloorPlan,
+  type Order,
+  type OrderJournalEvent,
+  type TableState,
+  type TableStatusUpdatedEvent,
+  type UserRole,
 } from '@app/shared'
 import { Canvas } from '@react-three/fiber'
-import { LocateFixedIcon, Rotate3dIcon, ScanIcon } from 'lucide-react'
+import { LocateFixedIcon, PencilIcon, Rotate3dIcon, ScanIcon } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { getFloorPlan } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { useNow } from '@/lib/use-now'
 import type { ConnectionState } from '@/lib/use-realtime-socket'
@@ -22,21 +22,27 @@ import {
   PASS_LABEL_POSITION,
   STAFF_LABEL_Y,
 } from './floor-plan-data'
+import { EditorPanel } from './editor-panel'
 import { buildScene, placeStaff, type StaffView } from './floor-scene-model'
 import { admitEffect, effectOfEvent, effectOfTableEvent, type SceneEffect } from './order-effects'
 import { LabelProjector, SceneLabel, type LabelAnchors } from './scene-labels'
 import { TableLabel } from './table-label'
 import { CameraRig, type CameraFocus, type CameraMode } from './scene/camera-rig'
 import { DiningTable } from './scene/dining-table'
+import { EditorScene } from './scene/editor-scene'
 import { Effects, type ActiveEffect } from './scene/effects'
 import { Room } from './scene/room'
 import { Staff, type StaffTrip } from './scene/staff'
 import { destinationsOf, planTrip, positionAt } from './staff-routes'
+import { useFloorEditor } from './use-floor-editor'
 
 const CAMERA_MODE_STORAGE_KEY = 'floorPlan.cameraMode'
 
 // La cuisine voit d'abord sa zone : plan de travail, rail à tickets et passe.
 const KITCHEN_FOCUS: CameraFocus = { x: 0, z: (KITCHEN_COUNTER_Z + PASS_COUNTER.z) / 2, zoom: 1.8 }
+
+// Place réservée à gauche de la vue de dessus pour le panneau de l'éditeur (w-72 et marges).
+const EDITOR_PANEL_INSET = 312
 
 const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -49,6 +55,10 @@ function readCameraMode(): CameraMode {
 }
 
 export type FloorPlan3DProps = {
+  // Plan de salle (useFloorPlan) : null pendant le chargement.
+  floorPlan: FloorPlan | null
+  floorPlanError: Error | null
+  onReloadFloorPlan: () => Promise<void>
   orders: Order[]
   // Occupation des tables, par numéro (useTablesRealtime).
   tableStates: Record<number, TableState>
@@ -75,6 +85,9 @@ export type FloorPlan3DProps = {
  * rien ne change, ce qui ménage la batterie sur mobile.
  */
 export default function FloorPlan3D({
+  floorPlan,
+  floorPlanError,
+  onReloadFloorPlan,
   orders,
   tableStates,
   unread,
@@ -87,19 +100,11 @@ export default function FloorPlan3D({
   subscribeToOrderEvents,
   subscribeToTableEvents,
 }: FloorPlan3DProps) {
-  // Tables du plan de salle, chargées à l'ouverture du plan (null pendant le chargement).
-  const [tables, setTables] = useState<FloorTable[] | null>(null)
-  const [planError, setPlanError] = useState<Error | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    getFloorPlan()
-      .then((plan) => !cancelled && setTables(plan.tables))
-      .catch((error: Error) => !cancelled && setPlanError(error))
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  const tables = floorPlan?.tables ?? null
+  // Éditeur de plan (MANAGER) : un brouillon remplace les tables tant qu'il est ouvert.
+  const editor = useFloorEditor(floorPlan, onReloadFloorPlan)
+  const editing = editor.draft !== null
+  const editingRef = useRef(editing)
 
   const scene = useMemo(
     () => buildScene(tables ?? [], orders, unread, role, tableStates),
@@ -129,10 +134,11 @@ export default function FloorPlan3D({
     ordersRef.current = orders
     tablesRef.current = tables
     staffRef.current = staff
-  }, [orders, tables, staff])
+    editingRef.current = editing
+  }, [orders, tables, staff, editing])
 
   const playEffect = useCallback((effect: SceneEffect | null) => {
-    if (!effect || document.hidden || prefersReducedMotion()) return
+    if (!effect || editingRef.current || document.hidden || prefersReducedMotion()) return
     const admitted = admitEffect(recentEffectsRef.current, performance.now())
     if (!admitted) return
     recentEffectsRef.current = admitted
@@ -151,7 +157,7 @@ export default function FloorPlan3D({
   }, [trips])
 
   const startTrip = useCallback((actorId: string, entry: OrderJournalEvent | TableStatusUpdatedEvent) => {
-    if (document.hidden || prefersReducedMotion()) return
+    if (editingRef.current || document.hidden || prefersReducedMotion()) return
     const member: StaffView | undefined = staffRef.current.find((candidate) => candidate.user.id === actorId)
     if (!member) return
     const destinations = destinationsOf(entry, member.user.role, tablesRef.current ?? [], ordersRef.current)
@@ -222,6 +228,19 @@ export default function FloorPlan3D({
     return () => layer.removeEventListener('wheel', forwardWheel)
   }, [glCanvas])
 
+  // En édition, la scène ne montre que le plan : on arrête animations et trajets en cours.
+  const startEditing = () => {
+    setEffects([])
+    setTrips({})
+    editor.start()
+  }
+
+  // Une table occupée ou avec des commandes visibles ne peut pas être retirée.
+  const isInUse = (tableNumber: number) =>
+    (tableStates[tableNumber] !== undefined && tableStates[tableNumber].status !== 'LIBRE') ||
+    orders.some((order) => order.tableNumber === tableNumber)
+  const selectedDraft = editor.draft?.find((table) => table.number === editor.selected) ?? null
+
   const toggleCameraMode = () => {
     const next = cameraMode === 'iso' ? 'free' : 'iso'
     setCameraMode(next)
@@ -234,7 +253,7 @@ export default function FloorPlan3D({
 
   // Plan de salle indisponible : l'erreur remonte à ViewErrorBoundary, qui
   // repasse sur le kanban.
-  if (planError) throw planError
+  if (floorPlanError) throw floorPlanError
 
   return (
     <div className="bg-muted/50 relative h-[min(72svh,720px)] min-h-[420px] min-w-0 overflow-hidden rounded-lg">
@@ -250,17 +269,30 @@ export default function FloorPlan3D({
         <ambientLight intensity={1.4} />
         <directionalLight position={[6, 12, 4]} intensity={1.8} />
         <CameraRig
-          mode={cameraMode}
+          mode={editing ? 'top' : cameraMode}
           focus={role === 'COOK' ? KITCHEN_FOCUS : undefined}
+          topInsetLeft={EDITOR_PANEL_INSET}
           resetSignal={resetSignal}
-          enabled={interactive}
+          enabled={interactive && !editing}
         />
         <Room kitchenTickets={scene.kitchenTickets} passPlates={scene.passPlates} />
-        {scene.tables.map((table) => (
-          <DiningTable key={table.number} table={table} onSelect={onSelectTable} />
-        ))}
-        <Staff staff={staff} trips={trips} anchors={anchors} onTripDone={endTrip} />
-        <Effects effects={effects} onDone={removeEffect} />
+        {editor.draft ? (
+          <EditorScene
+            tables={editor.draft}
+            selected={editor.selected}
+            faulty={editor.faulty}
+            onSelect={editor.setSelected}
+            onMove={editor.move}
+          />
+        ) : (
+          <>
+            {scene.tables.map((table) => (
+              <DiningTable key={table.number} table={table} onSelect={onSelectTable} />
+            ))}
+            <Staff staff={staff} trips={trips} anchors={anchors} onTripDone={endTrip} />
+            <Effects effects={effects} onDone={removeEffect} />
+          </>
+        )}
         <LabelProjector anchors={anchors} />
       </Canvas>
 
@@ -269,29 +301,49 @@ export default function FloorPlan3D({
         ref={labelLayerRef}
         className={cn('pointer-events-none absolute inset-0 overflow-hidden', isOffline && 'grayscale')}
       >
-        {scene.tables.map((table) => (
-          <SceneLabel
-            key={table.number}
-            anchors={anchors}
-            id={`table:${table.number}`}
-            position={[table.x, 1.6, table.z]}
-          >
-            <TableLabel table={table} now={now} onSelect={onSelectTable} />
-          </SceneLabel>
-        ))}
+        {editor.draft
+          ? editor.draft.map((table) => (
+              <SceneLabel
+                key={table.number}
+                anchors={anchors}
+                id={`draft:${table.number}`}
+                position={[table.x, 1, table.z]}
+              >
+                {/* Simple repère : l'appui doit atteindre la table dessous pour la glisser. */}
+                <span
+                  className={cn(
+                    'rounded-full px-2 py-0.5 text-xs font-semibold shadow-sm',
+                    editor.faulty.has(table.number) ? 'bg-red-600 text-white' : 'bg-background',
+                  )}
+                >
+                  T{table.number}
+                </span>
+              </SceneLabel>
+            ))
+          : scene.tables.map((table) => (
+              <SceneLabel
+                key={table.number}
+                anchors={anchors}
+                id={`table:${table.number}`}
+                position={[table.x, 1.6, table.z]}
+              >
+                <TableLabel table={table} now={now} onSelect={onSelectTable} />
+              </SceneLabel>
+            ))}
         <SceneLabel anchors={anchors} id="kitchen" position={KITCHEN_LABEL_POSITION}>
           <div className="bg-background/90 rounded-md px-2 py-1 text-xs whitespace-nowrap shadow-sm">
             <span className="font-semibold">Cuisine</span> · {cookingCount} en préparation · {validatedCount} validée
             {validatedCount > 1 ? 's' : ''}
           </div>
         </SceneLabel>
-        {staff.map(({ user, x, z }) => (
-          <SceneLabel key={user.id} anchors={anchors} id={`staff:${user.id}`} position={[x, STAFF_LABEL_Y, z]}>
-            <span className="bg-background/80 rounded px-1 text-[10px] whitespace-nowrap">
-              {user.name.split(' ')[0]}
-            </span>
-          </SceneLabel>
-        ))}
+        {!editing &&
+          staff.map(({ user, x, z }) => (
+            <SceneLabel key={user.id} anchors={anchors} id={`staff:${user.id}`} position={[x, STAFF_LABEL_Y, z]}>
+              <span className="bg-background/80 rounded px-1 text-[10px] whitespace-nowrap">
+                {user.name.split(' ')[0]}
+              </span>
+            </SceneLabel>
+          ))}
         <SceneLabel anchors={anchors} id="pass" position={PASS_LABEL_POSITION}>
           <div className="bg-background/90 rounded-md px-2 py-1 text-xs whitespace-nowrap shadow-sm">
             <span className="font-semibold">Passe</span> ·{' '}
@@ -302,24 +354,53 @@ export default function FloorPlan3D({
         </SceneLabel>
       </div>
 
-      <div className="absolute top-3 right-3 flex gap-2">
-        <Button size="sm" variant="outline" onClick={toggleCameraMode} aria-pressed={cameraMode === 'free'}>
-          {cameraMode === 'iso' ? <Rotate3dIcon /> : <ScanIcon />}
-          {cameraMode === 'iso' ? 'Caméra libre' : 'Vue iso'}
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => setResetSignal((n) => n + 1)} aria-label="Recentrer la vue">
-          <LocateFixedIcon />
-          <span className="hidden sm:inline">Recentrer</span>
-        </Button>
-      </div>
+      {!editing && (
+        <div className="absolute top-3 right-3 flex gap-2">
+          {canRoleEditFloorPlan(role) && floorPlan && (
+            <Button size="sm" variant="outline" onClick={startEditing}>
+              <PencilIcon />
+              <span className="hidden sm:inline">Modifier le plan</span>
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={toggleCameraMode} aria-pressed={cameraMode === 'free'}>
+            {cameraMode === 'iso' ? <Rotate3dIcon /> : <ScanIcon />}
+            {cameraMode === 'iso' ? 'Caméra libre' : 'Vue iso'}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setResetSignal((n) => n + 1)}
+            aria-label="Recentrer la vue"
+          >
+            <LocateFixedIcon />
+            <span className="hidden sm:inline">Recentrer</span>
+          </Button>
+        </div>
+      )}
 
-      {tables?.length === 0 && (
+      {editing && (
+        <EditorPanel
+          selected={selectedDraft}
+          selectedInUse={selectedDraft !== null && isInUse(selectedDraft.number)}
+          problems={editor.problems}
+          hasChanges={editor.hasChanges}
+          isSaving={editor.isSaving}
+          onAdd={editor.add}
+          onRemove={editor.remove}
+          onRenumber={editor.renumber}
+          onReshape={editor.reshape}
+          onCancel={editor.cancel}
+          onSave={() => void editor.save()}
+        />
+      )}
+
+      {!editing && tables?.length === 0 && (
         <div className="bg-background/90 absolute top-3 left-3 max-w-xs rounded-lg p-2 text-xs shadow-sm">
           Ce restaurant n'a pas encore de plan de salle : les commandes sont listées dans « Hors plan ».
         </div>
       )}
 
-      {tables !== null && scene.offPlan.length > 0 && (
+      {!editing && tables !== null && scene.offPlan.length > 0 && (
         <div className="bg-background/90 absolute bottom-3 left-3 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-2 rounded-lg p-2 text-xs shadow-sm">
           <span className="font-semibold">Hors plan</span>
           {[...new Set(scene.offPlan.map((order) => order.tableNumber))].map((tableNumber) => (

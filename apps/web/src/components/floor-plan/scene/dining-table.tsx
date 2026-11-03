@@ -1,4 +1,4 @@
-import type { TableShape } from '@app/shared'
+import type { FloorTable, TableShape } from '@app/shared'
 import type { ThreeEvent } from '@react-three/fiber'
 import { Suspense } from 'react'
 import { ViewErrorBoundary } from '@/components/view-error-boundary'
@@ -27,7 +27,7 @@ type Chair = { x: number; z: number; rotation: number }
 
 // Chaises face à la table, sur ses deux grands côtés (z). Une chaise « regarde »
 // vers +z quand sa rotation est nulle.
-function chairsOf(table: TableView): Chair[] {
+function chairsOf(table: FloorTable): Chair[] {
   const xs = table.seats >= 4 ? [-0.45, 0.45] : [0]
   return xs.flatMap((x) => [
     { x, z: -0.75, rotation: 0 },
@@ -37,7 +37,7 @@ function chairsOf(table: TableView): Chair[] {
 
 // Table et chaises en primitives : affichées pendant le chargement des modèles,
 // ou à leur place s'ils ne se chargent pas.
-function PrimitiveFurniture({ table }: { table: TableView }) {
+function PrimitiveFurniture({ table }: { table: FloorTable }) {
   const [width, depth] = TABLE_SIZE[table.shape]
   return (
     <group>
@@ -67,7 +67,7 @@ function PrimitiveFurniture({ table }: { table: TableView }) {
 
 // Mobilier du Furniture Kit : table nappée pour 4, petite table en bois pour 2
 // (la table du kit, raccourcie).
-function KitFurniture({ table }: { table: TableView }) {
+function KitFurniture({ table }: { table: FloorTable }) {
   return (
     <group>
       {table.shape === 'long' ? (
@@ -111,7 +111,7 @@ function SeatedGuests({ table }: { table: TableView }) {
 }
 
 // Assiettes et verres laissés par les clients partis.
-function DirtyDishes({ table }: { table: TableView }) {
+function DirtyDishes({ table }: { table: FloorTable }) {
   const xs = table.seats >= 4 ? [-0.45, 0.45] : [0]
   return xs.flatMap((x) =>
     [-0.22, 0.22].map((z) => (
@@ -127,6 +127,17 @@ function DirtyDishes({ table }: { table: TableView }) {
         </mesh>
       </group>
     )),
+  )
+}
+
+/** Table et chaises (modèles du kit, primitives pendant le chargement ou en cas d'échec). */
+export function TableFurniture({ table }: { table: FloorTable }) {
+  return (
+    <ViewErrorBoundary fallback={<PrimitiveFurniture table={table} />}>
+      <Suspense fallback={<PrimitiveFurniture table={table} />}>
+        <KitFurniture table={table} />
+      </Suspense>
+    </ViewErrorBoundary>
   )
 }
 
@@ -165,11 +176,7 @@ export function DiningTable({ table, onSelect }: DiningTableProps) {
         </mesh>
       )}
 
-      <ViewErrorBoundary fallback={<PrimitiveFurniture table={table} />}>
-        <Suspense fallback={<PrimitiveFurniture table={table} />}>
-          <KitFurniture table={table} />
-        </Suspense>
-      </ViewErrorBoundary>
+      <TableFurniture table={table} />
 
       {table.occupancy?.status === 'OCCUPEE' && <SeatedGuests table={table} />}
       {table.occupancy?.status === 'A_DEBARRASSER' && <DirtyDishes table={table} />}

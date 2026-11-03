@@ -4,7 +4,8 @@ import { useEffect, useRef } from 'react'
 import { Box3, Vector3 } from 'three'
 import { ROOM } from '../floor-plan-data'
 
-export type CameraMode = 'iso' | 'free'
+// `top` : vue de dessus de l'éditeur de plan (cuisine en haut de l'écran).
+export type CameraMode = 'iso' | 'free' | 'top'
 
 const { ACTION } = CameraControlsImpl
 
@@ -16,6 +17,8 @@ const ISO_DISTANCE = 30
 // largeur (W + D) / √2, hauteur (W + D) / √6 plus la hauteur des murs.
 const ISO_SCREEN_WIDTH = ((ROOM.width + ROOM.depth) / Math.SQRT2) * 1.1
 const ISO_SCREEN_HEIGHT = ((ROOM.width + ROOM.depth) / Math.sqrt(6) + 1) * 1.1
+// Vue de dessus : la pièce entière, avec une marge.
+const TOP_MARGIN = 1.08
 
 // Zoom en dessous duquel tables et étiquettes se chevauchent. Sur un écran
 // étroit, on cadre le centre de la salle à ce zoom et on la parcourt au doigt.
@@ -38,6 +41,8 @@ const WHOLE_ROOM: CameraFocus = { x: 0, z: 0, zoom: 1 }
 type CameraRigProps = {
   mode: CameraMode
   focus?: CameraFocus
+  // Vue de dessus : largeur (px) réservée à gauche, sous le panneau de l'éditeur.
+  topInsetLeft?: number
   // Incrémenté pour revenir à la vue iso de référence.
   resetSignal: number
   // Faux quand un dialog recouvre la scène : les gestes ne doivent pas la bouger.
@@ -45,14 +50,20 @@ type CameraRigProps = {
 }
 
 /**
- * Caméra orthographique : vue iso fixe (déplacement et zoom seulement) ou
- * caméra libre (rotation en plus). Le passage en vue iso est animé.
+ * Caméra orthographique : vue iso fixe (déplacement et zoom seulement), caméra
+ * libre (rotation en plus) ou vue de dessus (éditeur). Les changements de vue
+ * sont animés.
  */
-export function CameraRig({ mode, focus = WHOLE_ROOM, resetSignal, enabled }: CameraRigProps) {
+export function CameraRig({ mode, focus = WHOLE_ROOM, topInsetLeft = 0, resetSignal, enabled }: CameraRigProps) {
   const controlsRef = useRef<CameraControlsImpl>(null)
   const size = useThree((state) => state.size)
   const wholeRoomZoom = Math.min(size.width / ISO_SCREEN_WIDTH, size.height / ISO_SCREEN_HEIGHT)
   const fitZoom = Math.max(wholeRoomZoom, READABLE_ZOOM)
+  // Sur un écran étroit, on ne réserve rien : le panneau recouvre alors un coin du plan.
+  const topInset = size.width - topInsetLeft >= ROOM.width * READABLE_ZOOM ? topInsetLeft : 0
+  const topZoom = Math.min((size.width - topInset) / (ROOM.width * TOP_MARGIN), size.height / (ROOM.depth * TOP_MARGIN))
+  // Décalage du centre de vue pour que la salle occupe la place laissée libre à droite.
+  const topCenterX = -topInset / 2 / topZoom
   const placedRef = useRef(false)
 
   useEffect(() => {
@@ -64,15 +75,15 @@ export function CameraRig({ mode, focus = WHOLE_ROOM, resetSignal, enabled }: Ca
     // Le zoom arrière va jusqu'à voir toute la salle, même sur mobile.
     controls.minZoom = Math.min(fitZoom * 0.6, wholeRoomZoom)
     controls.maxZoom = fitZoom * 4
-    // Pas sous le sol, ni à la verticale exacte (rotation instable).
-    controls.minPolarAngle = 0.15
+    // Pas sous le sol, ni à la verticale exacte (rotation instable), sauf en vue de dessus.
+    controls.minPolarAngle = mode === 'top' ? 0 : 0.15
     controls.maxPolarAngle = Math.PI * 0.45
-  }, [fitZoom, wholeRoomZoom])
+  }, [fitZoom, wholeRoomZoom, mode])
 
   useEffect(() => {
     const controls = controlsRef.current
     if (!controls) return
-    if (mode === 'iso') {
+    if (mode !== 'free') {
       controls.mouseButtons.left = ACTION.TRUCK
       controls.mouseButtons.right = ACTION.TRUCK
       controls.mouseButtons.middle = ACTION.ZOOM
@@ -91,20 +102,30 @@ export function CameraRig({ mode, focus = WHOLE_ROOM, resetSignal, enabled }: Ca
   }, [mode])
 
   // Pose de référence : au montage (sans animation, quel que soit le mode), au
-  // retour en vue iso, sur demande (« Recentrer », dans les deux modes), et quand
-  // la taille du canvas change en vue iso. Passer en caméra libre ne bouge pas la
-  // caméra.
+  // retour en vue iso ou de dessus, sur demande (« Recentrer », dans tous les
+  // modes), et quand la taille du canvas change dans une vue fixe. Passer en
+  // caméra libre ne bouge pas la caméra.
   const lastResetRef = useRef(resetSignal)
+  const lastModeRef = useRef(mode)
   useEffect(() => {
     const controls = controlsRef.current
     const resetRequested = lastResetRef.current !== resetSignal
+    // En quittant la vue de dessus, même vers la caméra libre, on reprend la vue de référence.
+    const leftTopView = lastModeRef.current === 'top' && mode !== 'top'
     lastResetRef.current = resetSignal
-    if (!controls || (mode !== 'iso' && !resetRequested && placedRef.current)) return
+    lastModeRef.current = mode
+    if (!controls || (mode === 'free' && !resetRequested && !leftTopView && placedRef.current)) return
     const animate = placedRef.current
     placedRef.current = true
+    if (mode === 'top') {
+      // Très léger décalage en z : la cuisine (z < 0) reste en haut de l'écran.
+      void controls.setLookAt(topCenterX, ISO_DISTANCE, 0.001, topCenterX, 0, 0, animate)
+      void controls.zoomTo(topZoom, animate)
+      return
+    }
     void controls.setLookAt(focus.x + ISO_DISTANCE, ISO_DISTANCE, focus.z + ISO_DISTANCE, focus.x, 0, focus.z, animate)
     void controls.zoomTo(fitZoom * focus.zoom, animate)
-  }, [mode, resetSignal, fitZoom, focus.x, focus.z, focus.zoom])
+  }, [mode, resetSignal, fitZoom, topZoom, topCenterX, focus.x, focus.z, focus.zoom])
 
   return <CameraControls ref={controlsRef} makeDefault enabled={enabled} />
 }

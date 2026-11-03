@@ -14,6 +14,7 @@ import { toast } from 'sonner'
 import { useAuth } from '@/lib/auth-context'
 import { createEventChannel } from '@/lib/event-channel'
 import { useChat } from '@/lib/use-chat'
+import { useFloorPlan } from '@/lib/use-floor-plan'
 import { STATUS_LABELS, TABLE_STATUS_LABELS } from '@/lib/order-status'
 import { useOrdersRealtime } from '@/lib/use-orders-realtime'
 import { AckError, useRealtimeSocket, type ConnectionState } from '@/lib/use-realtime-socket'
@@ -66,6 +67,8 @@ export function OrderBoard({ user }: { user: User }) {
     resync: resyncTables,
     updateTableStatus,
   } = useTablesRealtime(socket, { onLiveEvent: liveTableEvents.emit })
+  // Plan de salle ; s'il change (éditeur), l'occupation des nouvelles tables est rechargée.
+  const floor = useFloorPlan(socket, { onUpdated: () => void resyncTables().catch(() => undefined) })
   const chat = useChat(socket, user.role)
   const [pendingOrderId, setPendingOrderId] = useState<string | null>(null)
   const [pendingTableNumber, setPendingTableNumber] = useState<number | null>(null)
@@ -207,6 +210,9 @@ export function OrderBoard({ user }: { user: User }) {
                 }
               >
                 <FloorPlan3D
+                  floorPlan={floor.plan}
+                  floorPlanError={floor.error}
+                  onReloadFloorPlan={floor.reload}
                   orders={orders}
                   tableStates={tableStates}
                   unread={chat.unread}

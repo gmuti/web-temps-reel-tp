@@ -8,7 +8,9 @@ import type {
   PresenceUpdatedEvent,
 } from './chat.js';
 import {
+  FloorPlanErrorCode,
   TableErrorCode,
+  type FloorPlan,
   type TableState,
   type TableStatusUpdatedEvent,
   type UpdateTableStatusInput,
@@ -43,6 +45,12 @@ export const TableSocketEvent = {
   SYNC: 'table:sync',
   STATUS_UPDATE: 'table:status:update',
   STATUS_UPDATED: 'table:status-updated',
+} as const;
+
+// Plan de salle modifié (éditeur) : diffusé à tout le restaurant, qui recharge
+// la géométrie des tables.
+export const FloorSocketEvent = {
+  UPDATED: 'floor:updated',
 } as const;
 
 // Chat et présence (cf. sujet, contrats `chat:message:create` / `chat:message:created`).
@@ -149,6 +157,7 @@ export function orderFromCreatedEvent(event: OrderCreatedEvent): Order {
 export const RealtimeErrorCode = {
   ...OrderStatusErrorCode,
   ...TableErrorCode,
+  ...FloorPlanErrorCode,
   VALIDATION_ERROR: 'VALIDATION_ERROR',
   FORBIDDEN: 'FORBIDDEN',
   CHANNEL_FORBIDDEN: 'CHANNEL_FORBIDDEN',
@@ -218,6 +227,7 @@ export interface ServerToClientEvents {
   [OrderSocketEvent.CREATED]: (event: OrderCreatedEvent) => void;
   [OrderSocketEvent.STATUS_UPDATED]: (event: OrderStatusUpdatedEvent) => void;
   [TableSocketEvent.STATUS_UPDATED]: (event: TableStatusUpdatedEvent) => void;
+  [FloorSocketEvent.UPDATED]: (event: FloorPlan) => void;
   [ChatSocketEvent.MESSAGE_CREATED]: (event: ChatMessageCreatedEvent) => void;
   [ChatSocketEvent.PRESENCE_UPDATED]: (event: PresenceUpdatedEvent) => void;
 }

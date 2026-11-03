@@ -35,6 +35,12 @@ dans [`docs/sujet.md`](docs/sujet.md).
 - Voit toutes les commandes du restaurant, peut effectuer toutes les
   transitions et est le seul à pouvoir annuler.
 
+**Manager**
+- Modifie le plan de salle depuis la vue « Plan » (bouton « Modifier le
+  plan ») : vue de dessus, tables déplacées à la souris sur une grille de
+  25 cm, ajout, retrait, numéro et forme ; chevauchements et sorties de salle
+  signalés avant d'enregistrer.
+
 **Pour tout le monde**
 - Tableau en **kanban** : À valider, Validée, En préparation, Prête.
 - **Plan de salle 3D** (bouton « Plan », à côté du kanban) : vue isométrique
@@ -194,6 +200,14 @@ débarrasser » tant qu'elle a des commandes en cours (`TABLE_HAS_ACTIVE_ORDERS`
 L'occupation est visible par tout le restaurant : elle ne dit rien des
 commandes, un serveur voit donc qu'une table de son collègue est occupée.
 
+Le manager modifie le plan (`PUT /floor-plan`) en renvoyant toutes les tables
+et la `version` du plan sur laquelle il a travaillé : si le plan a changé
+entre-temps, l'enregistrement est refusé (`FLOOR_PLAN_CONFLICT`). Le serveur
+vérifie les mêmes règles que l'éditeur (numéros uniques, places selon la forme,
+tables dans la salle, sans chevauchement) et refuse de retirer une table
+occupée ou qui a des commandes en cours (`TABLE_IN_USE`). Le nouveau plan est
+diffusé à tout le restaurant (`floor:updated`).
+
 ### Canaux de chat
 
 | Canal | Accès |
@@ -220,6 +234,7 @@ jeton.
 | `POST` | `/auth/login` | Connexion, renvoie le jeton |
 | `GET` | `/dishes` | Carte du restaurant |
 | `GET` | `/floor-plan` | Plan de salle : `{ tables: [{ number, x, z, shape, seats }] }` |
+| `PUT` | `/floor-plan` | Remplace le plan (manager) : `{ expectedVersion, tables }` |
 | `PATCH` | `/floor-plan/tables/:number/status` | Occupation d'une table (`{ expectedStatus, requestedStatus, guests? }`) |
 | `GET` | `/orders?status=` | Commandes visibles (en cours par défaut) |
 | `POST` | `/orders` | Création d'une commande (idempotente via `clientOrderId`) |
@@ -257,6 +272,7 @@ Commandes envoyées par le client, avec accusé de réception
 | `chat:message:created` | Membres du canal |
 | `presence:updated` | Tout le restaurant |
 | `table:status-updated` | Tout le restaurant |
+| `floor:updated` | Tout le restaurant (nouveau plan de salle) |
 
 Salles : `restaurant:<id>` (canal Général et présence),
 `restaurant:<id>:kitchen`, `restaurant:<id>:service`,

@@ -6,20 +6,23 @@ import {
   Param,
   ParseIntPipe,
   Patch,
+  Put,
   UseGuards,
 } from '@nestjs/common';
 import {
+  updateFloorPlanRequestSchema,
   updateTableStatusRequestSchema,
   userRoleSchema,
   type FloorPlan,
   type TableState,
+  type UpdateFloorPlanRequest,
   type UpdateTableStatusRequest,
 } from '@app/shared';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import type { JwtPayload } from '../auth/jwt-payload.type.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
-import { PrismaService } from '../prisma/prisma.service.js';
+import { FloorPlanService } from './floor-plan.service.js';
 import { TablesGateway } from './tables.gateway.js';
 import { TablesService, type TableActor } from './tables.service.js';
 
@@ -27,7 +30,7 @@ import { TablesService, type TableActor } from './tables.service.js';
 @Controller('floor-plan')
 export class FloorPlanController {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly floorPlan: FloorPlanService,
     private readonly tables: TablesService,
     private readonly gateway: TablesGateway,
   ) {}
@@ -36,14 +39,20 @@ export class FloorPlanController {
   // Le plan n'est pas filtré par rôle : il ne dit rien des commandes.
   @Get()
   async get(@CurrentUser() user: JwtPayload): Promise<FloorPlan> {
-    const { restaurantId } = this.actor(user);
-    const tables = await this.prisma.diningTable.findMany({
-      where: { restaurantId },
-      orderBy: { number: 'asc' },
-    });
-    return {
-      tables: tables.map(({ number, x, z, shape, seats }) => ({ number, x, z, shape, seats })),
-    };
+    return this.floorPlan.get(this.actor(user).restaurantId);
+  }
+
+  // PUT /floor-plan — remplace le plan (éditeur, rôle MANAGER). Diffusé à tout
+  // le restaurant, qui recharge la géométrie des tables.
+  @Put()
+  async replace(
+    @CurrentUser() user: JwtPayload,
+    @Body(new ZodValidationPipe(updateFloorPlanRequestSchema)) body: UpdateFloorPlanRequest,
+  ): Promise<FloorPlan> {
+    const actor = this.actor(user);
+    const plan = await this.floorPlan.replace(body, actor);
+    this.gateway.publishFloorUpdated(actor.restaurantId, plan);
+    return plan;
   }
 
   // PATCH /floor-plan/tables/:number/status — changement d'occupation (mêmes

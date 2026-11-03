@@ -26,10 +26,12 @@ enum OrderStatus {
 }
 
 model Restaurant {
-  id        String   @id @default(uuid())
-  name      String
-  slug      String   @unique
-  createdAt DateTime @default(now())
+  id               String   @id @default(uuid())
+  name             String
+  slug             String   @unique
+  createdAt        DateTime @default(now())
+  // Version du plan de salle : augmente à chaque modification par l'éditeur.
+  floorPlanVersion Int      @default(0)
 
   users       User[]
   orders      Order[]

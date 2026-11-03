@@ -7,9 +7,11 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import {
+  FloorSocketEvent,
   restaurantRoom,
   TableSocketEvent,
   updateTableStatusInputSchema,
+  type FloorPlan,
   type TableAck,
   type TableStatusUpdatedEvent,
   type TableSyncAck,
@@ -62,5 +64,9 @@ export class TablesGateway {
 
   publishStatusUpdated(restaurantId: string, event: TableStatusUpdatedEvent) {
     this.server.to(restaurantRoom(restaurantId)).emit(TableSocketEvent.STATUS_UPDATED, event);
+  }
+
+  publishFloorUpdated(restaurantId: string, plan: FloorPlan) {
+    this.server.to(restaurantRoom(restaurantId)).emit(FloorSocketEvent.UPDATED, plan);
   }
 }

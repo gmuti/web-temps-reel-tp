@@ -15,8 +15,14 @@ import { cn } from '@/lib/utils'
 import { useNow } from '@/lib/use-now'
 import type { ConnectionState } from '@/lib/use-realtime-socket'
 import { Button } from '@/components/ui/button'
-import { KITCHEN_COUNTER_Z, KITCHEN_LABEL_POSITION, PASS_COUNTER, PASS_LABEL_POSITION } from './floor-plan-data'
-import { buildScene, placeStaff } from './floor-scene-model'
+import {
+  KITCHEN_COUNTER_Z,
+  KITCHEN_LABEL_POSITION,
+  PASS_COUNTER,
+  PASS_LABEL_POSITION,
+  STAFF_LABEL_Y,
+} from './floor-plan-data'
+import { buildScene, placeStaff, type StaffView } from './floor-scene-model'
 import { admitEffect, effectOfEvent, effectOfTableEvent, type SceneEffect } from './order-effects'
 import { LabelProjector, SceneLabel, type LabelAnchors } from './scene-labels'
 import { TableLabel } from './table-label'
@@ -24,7 +30,8 @@ import { CameraRig, type CameraFocus, type CameraMode } from './scene/camera-rig
 import { DiningTable } from './scene/dining-table'
 import { Effects, type ActiveEffect } from './scene/effects'
 import { Room } from './scene/room'
-import { Staff } from './scene/staff'
+import { Staff, type StaffTrip } from './scene/staff'
+import { destinationsOf, planTrip, positionAt } from './staff-routes'
 
 const CAMERA_MODE_STORAGE_KEY = 'floorPlan.cameraMode'
 
@@ -114,13 +121,15 @@ export default function FloorPlan3D({
   const [effects, setEffects] = useState<ActiveEffect[]>([])
   const ordersRef = useRef(orders)
   const tablesRef = useRef(tables)
+  const staffRef = useRef(staff)
   const recentEffectsRef = useRef<number[]>([])
   const nextEffectIdRef = useRef(0)
 
   useEffect(() => {
     ordersRef.current = orders
     tablesRef.current = tables
-  }, [orders, tables])
+    staffRef.current = staff
+  }, [orders, tables, staff])
 
   const playEffect = useCallback((effect: SceneEffect | null) => {
     if (!effect || document.hidden || prefersReducedMotion()) return
@@ -131,15 +140,57 @@ export default function FloorPlan3D({
     setEffects((current) => [...current, { ...effect, id }])
   }, [])
 
-  useEffect(
-    () =>
-      subscribeToOrderEvents((entry) => playEffect(effectOfEvent(entry, tablesRef.current ?? [], ordersRef.current))),
-    [subscribeToOrderEvents, playEffect],
+  // Déplacements du personnel : l'auteur d'un événement, s'il est connecté, va
+  // sur place (table, fourneau, passe) puis revient à son poste. Un nouvel
+  // événement repart de là où il se trouve.
+  const [trips, setTrips] = useState<Record<string, StaffTrip>>({})
+  const tripsRef = useRef(trips)
+
+  useEffect(() => {
+    tripsRef.current = trips
+  }, [trips])
+
+  const startTrip = useCallback((actorId: string, entry: OrderJournalEvent | TableStatusUpdatedEvent) => {
+    if (document.hidden || prefersReducedMotion()) return
+    const member: StaffView | undefined = staffRef.current.find((candidate) => candidate.user.id === actorId)
+    if (!member) return
+    const destinations = destinationsOf(entry, member.user.role, tablesRef.current ?? [], ordersRef.current)
+    if (destinations.length === 0) return
+    const now = performance.now()
+    const current = tripsRef.current[actorId]
+    const from = current ? positionAt(current.waypoints, now - current.startedAt) : member
+    const home = { x: member.x, z: member.z }
+    setTrips((all) => ({ ...all, [actorId]: { waypoints: planTrip(from, destinations, home), startedAt: now } }))
+  }, [])
+
+  // Fin d'un trajet ; ignorée si un trajet plus récent l'a déjà remplacé.
+  const endTrip = useCallback(
+    (userId: string, startedAt: number) =>
+      setTrips((all) => {
+        if (all[userId]?.startedAt !== startedAt) return all
+        const rest = { ...all }
+        delete rest[userId]
+        return rest
+      }),
+    [],
   )
 
   useEffect(
-    () => subscribeToTableEvents((event) => playEffect(effectOfTableEvent(event, tablesRef.current ?? []))),
-    [subscribeToTableEvents, playEffect],
+    () =>
+      subscribeToOrderEvents((entry) => {
+        playEffect(effectOfEvent(entry, tablesRef.current ?? [], ordersRef.current))
+        startTrip(entry.type === 'order:created' ? entry.event.createdBy : entry.event.updatedBy, entry)
+      }),
+    [subscribeToOrderEvents, playEffect, startTrip],
+  )
+
+  useEffect(
+    () =>
+      subscribeToTableEvents((event) => {
+        playEffect(effectOfTableEvent(event, tablesRef.current ?? []))
+        startTrip(event.updatedBy, event)
+      }),
+    [subscribeToTableEvents, playEffect, startTrip],
   )
 
   const removeEffect = useCallback((id: number) => setEffects((current) => current.filter((e) => e.id !== id)), [])
@@ -208,7 +259,7 @@ export default function FloorPlan3D({
         {scene.tables.map((table) => (
           <DiningTable key={table.number} table={table} onSelect={onSelectTable} />
         ))}
-        <Staff staff={staff} />
+        <Staff staff={staff} trips={trips} anchors={anchors} onTripDone={endTrip} />
         <Effects effects={effects} onDone={removeEffect} />
         <LabelProjector anchors={anchors} />
       </Canvas>
@@ -235,7 +286,7 @@ export default function FloorPlan3D({
           </div>
         </SceneLabel>
         {staff.map(({ user, x, z }) => (
-          <SceneLabel key={user.id} anchors={anchors} id={`staff:${user.id}`} position={[x, 1.75, z]}>
+          <SceneLabel key={user.id} anchors={anchors} id={`staff:${user.id}`} position={[x, STAFF_LABEL_Y, z]}>
             <span className="bg-background/80 rounded px-1 text-[10px] whitespace-nowrap">
               {user.name.split(' ')[0]}
             </span>

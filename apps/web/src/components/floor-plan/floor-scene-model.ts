@@ -7,7 +7,7 @@ import {
   type TableState,
   type UserRole,
 } from '@app/shared'
-import { KITCHEN_COUNTER_Z, PASS_COUNTER, ROOM } from './floor-plan-data'
+import { FRONT_AISLE_Z, DINING_AISLES_Z, KITCHEN_WALK_Z, PASS_COUNTER, ROOM } from './floor-plan-data'
 
 /**
  * État visuel d'une table : d'abord celui de sa commande la plus urgente, sinon
@@ -131,8 +131,9 @@ export type StaffZone = 'kitchen' | 'floor' | 'office'
 
 export type StaffView = { user: ChatAuthor; zone: StaffZone; x: number; z: number }
 
-// Où se tient chaque rôle : cuisiniers entre le plan de travail et le passe,
-// serveurs côté salle devant le passe, responsables et managers à l'entrée.
+// Où se tient chaque rôle, toujours sur une allée (cf. staff-routes.ts) :
+// cuisiniers entre le plan de travail et le passe, serveurs côté salle devant
+// le passe, responsables et managers à l'entrée.
 const ZONE_OF_ROLE: Record<UserRole, StaffZone> = {
   COOK: 'kitchen',
   WAITER: 'floor',
@@ -141,9 +142,9 @@ const ZONE_OF_ROLE: Record<UserRole, StaffZone> = {
 }
 
 const ZONE_ORIGIN: Record<StaffZone, { x: number; z: number; step: number }> = {
-  kitchen: { x: -2.4, z: (KITCHEN_COUNTER_Z + PASS_COUNTER.z) / 2, step: 1.2 },
-  floor: { x: PASS_COUNTER.x + PASS_COUNTER.width / 2 + 0.8, z: PASS_COUNTER.z + 1, step: 0.8 },
-  office: { x: ROOM.width / 2 - 1, z: ROOM.depth / 2 - 2.2, step: -0.8 },
+  kitchen: { x: -2.4, z: KITCHEN_WALK_Z, step: 1.2 },
+  floor: { x: PASS_COUNTER.x + PASS_COUNTER.width / 2 + 0.8, z: FRONT_AISLE_Z, step: 0.8 },
+  office: { x: ROOM.width / 2 - 1, z: DINING_AISLES_Z[DINING_AISLES_Z.length - 1], step: -0.8 },
 }
 
 /**

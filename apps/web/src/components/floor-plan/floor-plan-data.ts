@@ -1,3 +1,5 @@
+import type { TableShape } from '@app/shared'
+
 // Géométrie fixe de la salle : pièce, cuisine et passe. Les tables viennent du
 // plan de salle du restaurant (GET /floor-plan).
 // Unités en mètres, repère de la scène 3D : x vers la droite, z vers l'avant (la
@@ -22,3 +24,22 @@ export const TICKET_RAIL_Z = PASS_COUNTER.z - 0.2
 // Points d'ancrage des étiquettes de la cuisine et du passe.
 export const KITCHEN_LABEL_POSITION: [number, number, number] = [ROOM.width / 2 - 2.5, 1.6, KITCHEN_COUNTER_Z]
 export const PASS_LABEL_POSITION: [number, number, number] = [PASS_COUNTER.x, 0.4, PASS_COUNTER.z + 0.6]
+
+// Dimensions au sol (x, z) des tables : la longue table suit l'axe x. Les
+// chaises sont sur les grands côtés (z), les bouts de table (x) restent libres.
+export const TABLE_SIZE: Record<TableShape, [number, number]> = {
+  small: [1.0, 0.98],
+  long: [1.85, 0.98],
+}
+
+// Circulation du personnel (cf. staff-routes.ts) : des allées horizontales
+// (axe x) qui longent les rangées de tables, un couloir vertical qui les relie
+// sans traverser de table, et un passage entre cuisine et salle au bout du passe.
+export const KITCHEN_WALK_Z = (KITCHEN_COUNTER_Z + PASS_COUNTER.z) / 2
+export const FRONT_AISLE_Z = PASS_COUNTER.z + 0.9
+export const DINING_AISLES_Z = [FRONT_AISLE_Z, 0.5, 3.4] as const
+export const CORRIDOR_X = 1.6
+export const KITCHEN_DOOR_X = PASS_COUNTER.x + PASS_COUNTER.width / 2 + 0.7
+
+// Hauteur de l'étiquette (prénom) au-dessus d'une silhouette du personnel.
+export const STAFF_LABEL_Y = 1.75

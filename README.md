@@ -46,8 +46,9 @@ dans [`docs/sujet.md`](docs/sujet.md).
   Les événements en direct sont animés (ticket qui part en cuisine, assiette du
   fourneau au passe puis du passe à la table, anneau sous une nouvelle
   commande), les tables en retard sont signalées, et les personnes connectées
-  apparaissent dans leur zone (cuisine, salle, entrée). La cuisine voit d'abord
-  sa zone.
+  apparaissent dans leur zone (cuisine, salle, entrée) et se déplacent quand
+  elles agissent : à la table, au fourneau, au passe, par les allées. La
+  cuisine voit d'abord sa zone.
   Le mobilier vient du [Furniture Kit de Kenney](https://kenney.nl/assets/furniture-kit)
   (CC0, licence dans `apps/web/public/models/kenney-furniture/`).
 - Sur chaque commande : carrousel des photos des plats, contraintes en badge.

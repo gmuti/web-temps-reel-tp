@@ -3,6 +3,7 @@ import type { ThreeEvent } from '@react-three/fiber'
 import { Suspense } from 'react'
 import { ViewErrorBoundary } from '@/components/view-error-boundary'
 import type { TableView } from '../floor-scene-model'
+import { TABLE_SIZE } from '../floor-plan-data'
 import { TABLE_STATE_STYLES } from '../table-states'
 import { KitModel } from './kit-model'
 
@@ -12,12 +13,6 @@ const CHAIR = '#6d4c41'
 
 // Au-delà de ce déplacement (en pixels), le geste est un glissé de caméra, pas un clic.
 const CLICK_MAX_DRAG = 6
-
-// Dimensions au sol (x, z) : la longue table suit l'axe x.
-const TABLE_SIZE: Record<TableShape, [number, number]> = {
-  small: [1.0, 0.98],
-  long: [1.85, 0.98],
-}
 
 // Anneau d'état autour de la table, chaises comprises.
 const RING_RADIUS: Record<TableShape, [number, number]> = {

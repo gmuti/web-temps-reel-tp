@@ -1,5 +1,46 @@
 # Web Temps Réel — Master 2 Architecte logiciel / Informaticien web
 
+## Architecture technique
+
+Monorepo npm workspaces :
+
+```text
+apps/
+  api/   NestJS (Node 22, ESM) + Prisma + PostgreSQL
+  web/   React + Vite + TypeScript + Tailwind CSS + shadcn/ui
+docker-compose.yml
+```
+
+Aucune fonctionnalité métier n'est encore implémentée : ce dépôt contient
+uniquement l'ossature (API NestJS avec un endpoint `/health`, base
+PostgreSQL, client Prisma configuré, front React avec shadcn/ui prêt à
+l'emploi, conteneurisation complète).
+
+### Lancer le projet avec Docker (recommandé)
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+- Front : http://localhost:5173
+- API : http://localhost:3001 (`/health` vérifie la connexion à PostgreSQL)
+- PostgreSQL : localhost:5432
+
+### Lancer sans Docker
+
+```bash
+npm install
+
+# apps/api/.env et apps/web/.env à créer à partir des .env.example respectifs
+# (nécessite un PostgreSQL local ou celui du docker-compose : docker compose up postgres)
+
+npx prisma migrate dev --schema apps/api/prisma/schema.prisma
+
+npm run dev:api   # http://localhost:3001
+npm run dev:web   # http://localhost:5173
+```
+
 ## Séquence pédagogique : 3 × 3 heures
 
 ## Objectifs du module

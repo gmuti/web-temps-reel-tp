@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+apps/api/src/generated/
+
+# Env files
+.env
+.env.*.local
+!.env.example
+
+# Logs
+npm-debug.log*
+*.log
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Vitest / coverage
+coverage/
+
+# Docker volumes data (if bind-mounted locally)
+.docker/

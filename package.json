@@ -1,0 +1,15 @@
+{
+  "name": "web-temps-reel",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "shared"
+  ],
+  "scripts": {
+    "build:shared": "npm run build --workspace shared",
+    "dev:api": "npm run build:shared && npm run start:dev --workspace apps/api",
+    "dev:web": "npm run dev --workspace apps/web",
+    "build:api": "npm run build:shared && npm run build --workspace apps/api",
+    "build:web": "npm run build --workspace apps/web"
+  }
+}

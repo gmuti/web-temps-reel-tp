@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Les valeurs correspondent aux schémas Zod de shared/src/role.ts et order.ts —
+// toute modification doit être répercutée des deux côtés.
+enum UserRole {
+  RESPONSABLE
+  MANAGER
+  WAITER
+  COOK
+}
+
+enum OrderStatus {
+  A_VALIDER
+  VALIDEE
+  EN_PREPARATION
+  PRETE
+  SERVIE
+  ANNULEE
+}
+
+model Restaurant {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+
+  users  User[]
+  orders Order[]
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         UserRole
+  restaurantId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  restaurant Restaurant? @relation(fields: [restaurantId], references: [id])
+  orders     Order[]     @relation("OrderWaiter")
+
+  @@index([restaurantId])
+}
+
+model Order {
+  id            String      @id @default(uuid())
+  restaurantId  String
+  tableNumber   Int
+  status        OrderStatus @default(A_VALIDER)
+  comment       String?
+  // Idempotence : rejouer une création avec le même clientOrderId ne doit
+  // jamais produire une seconde commande (cf. README, séance 1).
+  clientOrderId String?     @unique
+  waiterId      String
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  restaurant Restaurant  @relation(fields: [restaurantId], references: [id])
+  waiter     User        @relation("OrderWaiter", fields: [waiterId], references: [id])
+  items      OrderItem[]
+
+  @@index([restaurantId, status])
+}
+
+model OrderItem {
+  id       String  @id @default(uuid())
+  orderId  String
+  meal     String
+  quantity Int
+  // Prix unitaire au moment de la commande (indépendant d'un futur prix de
+  // carte) — Decimal pour éviter les erreurs d'arrondi des flottants.
+  price    Decimal @db.Decimal(10, 2)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}

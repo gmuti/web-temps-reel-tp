@@ -28,6 +28,23 @@ const DEMO_DISHES = [
   { name: 'Limonade maison', price: 4.5, imageUrl: '/dishes/limonade.svg' },
 ];
 
+// Plan de salle de démo (positions en mètres, cf. shared/src/floor.ts) : trois
+// rangées de tables devant le passe-plat, la cuisine étant au fond (z < 0).
+const DEMO_TABLES = [
+  { number: 1, x: -6, z: -1, shape: 'small' as const, seats: 2 },
+  { number: 2, x: -3, z: -1, shape: 'long' as const, seats: 4 },
+  { number: 3, x: 3, z: -1, shape: 'long' as const, seats: 4 },
+  { number: 4, x: 6, z: -1, shape: 'small' as const, seats: 2 },
+  { number: 5, x: -6, z: 2, shape: 'long' as const, seats: 4 },
+  { number: 6, x: -3, z: 2, shape: 'small' as const, seats: 2 },
+  { number: 7, x: 0, z: 2, shape: 'long' as const, seats: 4 },
+  { number: 8, x: 3, z: 2, shape: 'small' as const, seats: 2 },
+  { number: 9, x: 6, z: 2, shape: 'long' as const, seats: 4 },
+  { number: 10, x: -4.5, z: 4.8, shape: 'small' as const, seats: 2 },
+  { number: 11, x: 0, z: 4.8, shape: 'long' as const, seats: 4 },
+  { number: 12, x: 4.5, z: 4.8, shape: 'small' as const, seats: 2 },
+];
+
 // Idempotent (upserts) : exécuté à chaque démarrage du conteneur api.
 async function main() {
   const restaurant = await prisma.restaurant.upsert({
@@ -60,7 +77,17 @@ async function main() {
     });
   }
 
-  console.log(`Restaurant "${restaurant.name}" (${restaurant.id}) prêt, ${DEMO_DISHES.length} plats à la carte.`);
+  for (const table of DEMO_TABLES) {
+    await prisma.diningTable.upsert({
+      where: { restaurantId_number: { restaurantId: restaurant.id, number: table.number } },
+      update: { x: table.x, z: table.z, shape: table.shape, seats: table.seats },
+      create: { ...table, restaurantId: restaurant.id },
+    });
+  }
+
+  console.log(
+    `Restaurant "${restaurant.name}" (${restaurant.id}) prêt, ${DEMO_DISHES.length} plats à la carte, ${DEMO_TABLES.length} tables.`,
+  );
   console.log(`Comptes de démo (mot de passe : "${DEMO_PASSWORD}") :`);
   for (const demoUser of DEMO_USERS) {
     console.log(`  - ${demoUser.role.padEnd(11)} ${demoUser.email}`);

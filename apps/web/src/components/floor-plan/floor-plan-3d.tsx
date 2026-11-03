@@ -1,18 +1,13 @@
-import type { ChatAuthor, Order, OrderJournalEvent, UserRole } from '@app/shared'
+import type { ChatAuthor, FloorTable, Order, OrderJournalEvent, UserRole } from '@app/shared'
 import { Canvas } from '@react-three/fiber'
 import { LocateFixedIcon, Rotate3dIcon, ScanIcon } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { getFloorPlan } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { useNow } from '@/lib/use-now'
 import type { ConnectionState } from '@/lib/use-realtime-socket'
 import { Button } from '@/components/ui/button'
-import {
-  FLOOR_TABLES,
-  KITCHEN_COUNTER_Z,
-  KITCHEN_LABEL_POSITION,
-  PASS_COUNTER,
-  PASS_LABEL_POSITION,
-} from './floor-plan-data'
+import { KITCHEN_COUNTER_Z, KITCHEN_LABEL_POSITION, PASS_COUNTER, PASS_LABEL_POSITION } from './floor-plan-data'
 import { buildScene, placeStaff } from './floor-scene-model'
 import { admitEffect, effectOfEvent } from './order-effects'
 import { LabelProjector, SceneLabel, type LabelAnchors } from './scene-labels'
@@ -72,7 +67,21 @@ export default function FloorPlan3D({
   onContextLost,
   subscribeToOrderEvents,
 }: FloorPlan3DProps) {
-  const scene = useMemo(() => buildScene(FLOOR_TABLES, orders, unread, role), [orders, unread, role])
+  // Tables du plan de salle, chargées à l'ouverture du plan (null pendant le chargement).
+  const [tables, setTables] = useState<FloorTable[] | null>(null)
+  const [planError, setPlanError] = useState<Error | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    getFloorPlan()
+      .then((plan) => !cancelled && setTables(plan.tables))
+      .catch((error: Error) => !cancelled && setPlanError(error))
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const scene = useMemo(() => buildScene(tables ?? [], orders, unread, role), [tables, orders, unread, role])
   const now = useNow(15_000)
   const [cameraMode, setCameraMode] = useState<CameraMode>(readCameraMode)
   const [resetSignal, setResetSignal] = useState(0)
@@ -88,18 +97,20 @@ export default function FloorPlan3D({
   // commande servie a déjà quitté l'état suivant).
   const [effects, setEffects] = useState<ActiveEffect[]>([])
   const ordersRef = useRef(orders)
+  const tablesRef = useRef(tables)
   const recentEffectsRef = useRef<number[]>([])
   const nextEffectIdRef = useRef(0)
 
   useEffect(() => {
     ordersRef.current = orders
-  }, [orders])
+    tablesRef.current = tables
+  }, [orders, tables])
 
   useEffect(
     () =>
       subscribeToOrderEvents((entry) => {
         if (document.hidden || prefersReducedMotion()) return
-        const effect = effectOfEvent(entry, FLOOR_TABLES, ordersRef.current)
+        const effect = effectOfEvent(entry, tablesRef.current ?? [], ordersRef.current)
         if (!effect) return
         const admitted = admitEffect(recentEffectsRef.current, performance.now())
         if (!admitted) return
@@ -148,6 +159,10 @@ export default function FloorPlan3D({
       // Stockage indisponible (navigation privée) : le choix n'est simplement pas mémorisé.
     }
   }
+
+  // Plan de salle indisponible : l'erreur remonte à ViewErrorBoundary, qui
+  // repasse sur le kanban.
+  if (planError) throw planError
 
   return (
     <div className="bg-muted/50 relative h-[min(72svh,720px)] min-h-[420px] min-w-0 overflow-hidden rounded-lg">
@@ -226,7 +241,13 @@ export default function FloorPlan3D({
         </Button>
       </div>
 
-      {scene.offPlan.length > 0 && (
+      {tables?.length === 0 && (
+        <div className="bg-background/90 absolute top-3 left-3 max-w-xs rounded-lg p-2 text-xs shadow-sm">
+          Ce restaurant n'a pas encore de plan de salle : les commandes sont listées dans « Hors plan ».
+        </div>
+      )}
+
+      {tables !== null && scene.offPlan.length > 0 && (
         <div className="bg-background/90 absolute bottom-3 left-3 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-2 rounded-lg p-2 text-xs shadow-sm">
           <span className="font-semibold">Hors plan</span>
           {[...new Set(scene.offPlan.map((order) => order.tableNumber))].map((tableNumber) => (

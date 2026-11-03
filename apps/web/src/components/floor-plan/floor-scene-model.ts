@@ -1,5 +1,12 @@
-import { canSeeAllOrders, orderChatChannel, type ChatAuthor, type Order, type UserRole } from '@app/shared'
-import { KITCHEN_COUNTER_Z, PASS_COUNTER, ROOM, type FloorTable } from './floor-plan-data'
+import {
+  canSeeAllOrders,
+  orderChatChannel,
+  type ChatAuthor,
+  type FloorTable,
+  type Order,
+  type UserRole,
+} from '@app/shared'
+import { KITCHEN_COUNTER_Z, PASS_COUNTER, ROOM } from './floor-plan-data'
 
 /**
  * État visuel d'une table, déduit de ses commandes en cours.

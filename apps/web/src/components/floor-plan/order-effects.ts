@@ -1,4 +1,4 @@
-import { OrderSocketEvent, type Order, type OrderJournalEvent } from '@app/shared'
+import { OrderSocketEvent, type FloorTable, type Order, type OrderJournalEvent } from '@app/shared'
 import {
   COUNTER_HEIGHT,
   KITCHEN_COUNTER_Z,
@@ -6,7 +6,6 @@ import {
   PASS_HEIGHT,
   TICKET_RAIL_Y,
   TICKET_RAIL_Z,
-  type FloorTable,
 } from './floor-plan-data'
 import { TABLE_STATE_STYLES } from './table-states'
 

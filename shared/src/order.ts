@@ -141,5 +141,7 @@ export const OrderStatusErrorCode = {
   FORBIDDEN_TRANSITION: 'FORBIDDEN_TRANSITION',
   // Création : un plat demandé n'est pas à la carte du restaurant.
   UNKNOWN_DISH: 'UNKNOWN_DISH',
+  // Création : la table n'existe pas sur le plan de salle du restaurant.
+  UNKNOWN_TABLE: 'UNKNOWN_TABLE',
 } as const;
 export type OrderStatusErrorCode = (typeof OrderStatusErrorCode)[keyof typeof OrderStatusErrorCode];

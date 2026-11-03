@@ -1,6 +1,5 @@
-import { orderChatChannel, type Order } from '@app/shared'
+import { orderChatChannel, type FloorTable, type Order } from '@app/shared'
 import { describe, expect, it } from 'vitest'
-import type { FloorTable } from './floor-plan-data'
 import { buildScene, isLate, placeStaff } from './floor-scene-model'
 
 const TABLES: FloorTable[] = [

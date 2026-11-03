@@ -36,6 +36,7 @@ model Restaurant {
   messages    Message[]
   dishes      Dish[]
   orderEvents OrderEvent[]
+  tables      DiningTable[]
 }
 
 model User {
@@ -111,6 +112,30 @@ model Dish {
   orderItems OrderItem[]
 
   @@unique([restaurantId, name])
+}
+
+// Valeurs alignées sur tableShapeSchema (shared/src/floor.ts).
+enum TableShape {
+  small
+  long
+}
+
+// Table du plan de salle. `Order.tableNumber` reste un numéro (pas de clé
+// étrangère) : les commandes existantes et le contrat d'API ne changent pas ;
+// si le restaurant a un plan, le numéro est vérifié à la création.
+model DiningTable {
+  id           String     @id @default(uuid())
+  restaurantId String
+  number       Int
+  // Position au sol en mètres, origine au centre de la salle (cf. shared/src/floor.ts).
+  x            Float
+  z            Float
+  shape        TableShape
+  seats        Int
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@unique([restaurantId, number])
 }
 
 // Journal des événements publiés sur les commandes : l'identifiant croissant sert

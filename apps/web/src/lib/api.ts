@@ -1,4 +1,12 @@
-import { authResponseSchema, dishesListSchema, type AuthResponse, type Dish, type LoginInput } from '@app/shared'
+import {
+  authResponseSchema,
+  dishesListSchema,
+  floorPlanSchema,
+  type AuthResponse,
+  type Dish,
+  type FloorPlan,
+  type LoginInput,
+} from '@app/shared'
 
 export const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
 
@@ -53,4 +61,9 @@ export async function login(input: LoginInput): Promise<AuthResponse> {
 export async function getDishes(): Promise<Dish[]> {
   const data = await request<unknown>('/dishes')
   return dishesListSchema.parse(data)
+}
+
+export async function getFloorPlan(): Promise<FloorPlan> {
+  const data = await request<unknown>('/floor-plan')
+  return floorPlanSchema.parse(data)
 }

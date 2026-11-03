@@ -84,6 +84,8 @@ export class OrdersService {
       return { order: this.toOrder(existing), created: false, event: null };
     }
 
+    await this.assertTableOnPlan(input.restaurantId, input.tableNumber);
+
     const dishIds = [...new Set(input.items.map((item) => item.dishId))];
     const dishes = await this.prisma.dish.findMany({
       where: { id: { in: dishIds }, restaurantId: input.restaurantId },
@@ -253,6 +255,26 @@ export class OrdersService {
         }) as OrderJournalEvent,
     );
     return { events, complete: rows.length <= EVENTS_SINCE_LIMIT };
+  }
+
+  /**
+   * Si le restaurant a décrit sa salle (au moins une table), le numéro doit
+   * désigner une table du plan. Sans plan, tout numéro reste accepté.
+   */
+  private async assertTableOnPlan(restaurantId: string, tableNumber: number) {
+    const [planSize, table] = await Promise.all([
+      this.prisma.diningTable.count({ where: { restaurantId } }),
+      this.prisma.diningTable.findUnique({
+        where: { restaurantId_number: { restaurantId, number: tableNumber } },
+        select: { id: true },
+      }),
+    ]);
+    if (planSize > 0 && !table) {
+      throw new BadRequestException({
+        message: `La table ${tableNumber} n'existe pas sur le plan de salle.`,
+        errorCode: OrderStatusErrorCode.UNKNOWN_TABLE,
+      });
+    }
   }
 
   private visibleTo(viewer: OrderViewer) {

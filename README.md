@@ -135,8 +135,9 @@ formulaire de commande et du chat.
 Le plan de salle (`components/floor-plan/`) est une seconde vue branchée sur
 le même état qu'`OrderBoard` : il ne se connecte pas au socket.
 `floor-scene-model.ts` déduit l'état de chaque table des commandes (fonction
-pure, testée) et la scène React Three Fiber ne fait que l'afficher. Le plan est
-statique (`floor-plan-data.ts`) ; les commandes dont la table n'y figure pas
+pure, testée) et la scène React Three Fiber ne fait que l'afficher. Les tables
+viennent de `GET /floor-plan` (la pièce, la cuisine et le passe restent fixes,
+dans `floor-plan-data.ts`) ; les commandes dont la table n'y figure pas
 apparaissent dans « Hors plan ». three étant lourd (~260 Ko gzip), la vue est
 chargée à la demande, rendue seulement quand quelque chose change, et
 remplacée par le kanban si WebGL est indisponible ou perdu. Les modèles
@@ -176,6 +177,14 @@ Un serveur ne voit et ne modifie que ses propres commandes ; les autres rôles
 voient toutes celles du restaurant. Le nom et le prix des plats sont lus dans
 la carte côté serveur, jamais fournis par le client.
 
+### Plan de salle et numéros de table
+
+Les tables du restaurant (`DiningTable`, cf. [`shared/src/floor.ts`](shared/src/floor.ts))
+forment son plan de salle ; le seed en crée 12 pour « Chez Demo ». Si un
+restaurant a un plan, une commande (REST ou Socket.IO) pour une table qui n'y
+figure pas est refusée avec `UNKNOWN_TABLE`. Un restaurant sans plan accepte
+tout numéro de table, comme avant.
+
 ### Canaux de chat
 
 | Canal | Accès |
@@ -201,6 +210,7 @@ jeton.
 | `POST` | `/auth/register` | Création de compte |
 | `POST` | `/auth/login` | Connexion, renvoie le jeton |
 | `GET` | `/dishes` | Carte du restaurant |
+| `GET` | `/floor-plan` | Plan de salle : `{ tables: [{ number, x, z, shape, seats }] }` |
 | `GET` | `/orders?status=` | Commandes visibles (en cours par défaut) |
 | `POST` | `/orders` | Création d'une commande (idempotente via `clientOrderId`) |
 | `PATCH` | `/orders/:orderId/status` | Demande de transition |

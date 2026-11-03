@@ -1,7 +1,7 @@
+import type { TableShape } from '@app/shared'
 import type { ThreeEvent } from '@react-three/fiber'
 import { Suspense } from 'react'
 import { ViewErrorBoundary } from '@/components/view-error-boundary'
-import type { TableShape } from '../floor-plan-data'
 import type { TableView } from '../floor-scene-model'
 import { TABLE_STATE_STYLES } from '../table-states'
 import { KitModel } from './kit-model'
@@ -33,7 +33,7 @@ type Chair = { x: number; z: number; rotation: number }
 // Chaises face à la table, sur ses deux grands côtés (z). Une chaise « regarde »
 // vers +z quand sa rotation est nulle.
 function chairsOf(table: TableView): Chair[] {
-  const xs = table.seats === 4 ? [-0.45, 0.45] : [0]
+  const xs = table.seats >= 4 ? [-0.45, 0.45] : [0]
   return xs.flatMap((x) => [
     { x, z: -0.75, rotation: 0 },
     { x, z: 0.75, rotation: Math.PI },

@@ -3,6 +3,7 @@ export * from './restaurant.js';
 export * from './user.js';
 export * from './auth.js';
 export * from './dish.js';
+export * from './floor.js';
 export * from './order.js';
 export * from './chat.js';
 export * from './realtime.js';

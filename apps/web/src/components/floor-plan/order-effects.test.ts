@@ -1,6 +1,5 @@
-import type { Order, OrderJournalEvent } from '@app/shared'
+import type { FloorTable, Order, OrderJournalEvent } from '@app/shared'
 import { describe, expect, it } from 'vitest'
-import type { FloorTable } from './floor-plan-data'
 import { admitEffect, EFFECT_WINDOW_MS, effectOfEvent, MAX_EFFECTS_PER_WINDOW } from './order-effects'
 
 const TABLES: FloorTable[] = [{ number: 4, x: 6, z: -1, shape: 'small', seats: 2 }]

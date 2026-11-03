@@ -1,7 +1,7 @@
 import type { Order, UserRole } from '@app/shared'
 import { Canvas } from '@react-three/fiber'
 import { LocateFixedIcon, Rotate3dIcon, ScanIcon } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { useNow } from '@/lib/use-now'
 import type { ConnectionState } from '@/lib/use-realtime-socket'
@@ -75,6 +75,20 @@ export default function FloorPlan3D({
     return () => glCanvas.removeEventListener('webglcontextlost', handleContextLost)
   }, [glCanvas, onContextLost])
 
+  // Les étiquettes sont au-dessus du canvas : sans relais, la molette y ferait
+  // défiler la page au lieu de zoomer sur le plan.
+  const labelLayerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const layer = labelLayerRef.current
+    if (!layer || !glCanvas) return
+    const forwardWheel = (event: WheelEvent) => {
+      event.preventDefault()
+      glCanvas.dispatchEvent(new WheelEvent('wheel', event))
+    }
+    layer.addEventListener('wheel', forwardWheel, { passive: false })
+    return () => layer.removeEventListener('wheel', forwardWheel)
+  }, [glCanvas])
+
   const toggleCameraMode = () => {
     const next = cameraMode === 'iso' ? 'free' : 'iso'
     setCameraMode(next)
@@ -107,7 +121,10 @@ export default function FloorPlan3D({
       </Canvas>
 
       {/* Étiquettes HTML, placées au-dessus des objets de la scène par LabelProjector */}
-      <div className={cn('pointer-events-none absolute inset-0 overflow-hidden', isOffline && 'grayscale')}>
+      <div
+        ref={labelLayerRef}
+        className={cn('pointer-events-none absolute inset-0 overflow-hidden', isOffline && 'grayscale')}
+      >
         {scene.tables.map((table) => (
           <SceneLabel
             key={table.number}

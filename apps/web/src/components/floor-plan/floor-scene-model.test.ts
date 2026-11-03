@@ -4,8 +4,8 @@ import type { FloorTable } from './floor-plan-data'
 import { buildScene } from './floor-scene-model'
 
 const TABLES: FloorTable[] = [
-  { number: 1, x: 0, z: 0, shape: 'round', seats: 2 },
-  { number: 2, x: 2, z: 0, shape: 'square', seats: 4 },
+  { number: 1, x: 0, z: 0, shape: 'small', seats: 2 },
+  { number: 2, x: 2, z: 0, shape: 'long', seats: 4 },
 ]
 
 let sequence = 0

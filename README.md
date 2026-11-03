@@ -43,6 +43,8 @@ dans [`docs/sujet.md`](docs/sujet.md).
   assiettes prêtes sur le passe, tickets et fourneaux en cuisine. Un clic sur
   une table ouvre ses commandes, avec les mêmes actions que le kanban, et
   permet d'en créer une pour cette table. Caméra isométrique fixe ou libre.
+  Le mobilier vient du [Furniture Kit de Kenney](https://kenney.nl/assets/furniture-kit)
+  (CC0, licence dans `apps/web/public/models/kenney-furniture/`).
 - Sur chaque commande : carrousel des photos des plats, contraintes en badge.
 - **Chat d'équipe** : canal Général, canaux Cuisine et Salle selon le rôle, et
   une discussion par commande ; historique, auteur et heure de chaque message,
@@ -132,7 +134,10 @@ pure, testée) et la scène React Three Fiber ne fait que l'afficher. Le plan es
 statique (`floor-plan-data.ts`) ; les commandes dont la table n'y figure pas
 apparaissent dans « Hors plan ». three étant lourd (~260 Ko gzip), la vue est
 chargée à la demande, rendue seulement quand quelque chose change, et
-remplacée par le kanban si WebGL est indisponible ou perdu.
+remplacée par le kanban si WebGL est indisponible ou perdu. Les modèles
+`.glb` (11 fichiers, ~180 Ko, ~47 Ko en gzip) sont servis depuis `public/` et
+préchargés à l'ouverture du plan ; tant qu'ils chargent, ou s'ils échouent, le
+mobilier est dessiné en formes simples (`scene/kit-model.tsx`).
 
 ## Règles métier
 

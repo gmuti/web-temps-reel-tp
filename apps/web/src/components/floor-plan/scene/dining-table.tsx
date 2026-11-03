@@ -1,37 +1,111 @@
 import type { ThreeEvent } from '@react-three/fiber'
+import { Suspense } from 'react'
+import { ViewErrorBoundary } from '@/components/view-error-boundary'
+import type { TableShape } from '../floor-plan-data'
 import type { TableView } from '../floor-scene-model'
 import { TABLE_STATE_STYLES } from '../table-states'
+import { KitModel } from './kit-model'
 
-const TABLE_HEIGHT = 0.75
+const TABLE_HEIGHT = 0.73
 const WOOD = '#a1887f'
 const CHAIR = '#6d4c41'
 
 // Au-delà de ce déplacement (en pixels), le geste est un glissé de caméra, pas un clic.
 const CLICK_MAX_DRAG = 6
 
+// Dimensions au sol (x, z) : la longue table suit l'axe x.
+const TABLE_SIZE: Record<TableShape, [number, number]> = {
+  small: [1.0, 0.98],
+  long: [1.85, 0.98],
+}
+
+// Anneau d'état autour de la table, chaises comprises.
+const RING_RADIUS: Record<TableShape, [number, number]> = {
+  small: [1.05, 1.3],
+  long: [1.4, 1.65],
+}
+
+// Orientation de la chaise du kit par rapport à la convention « regarde vers +z ».
+const CHAIR_MODEL_ROTATION = 0
+
+type Chair = { x: number; z: number; rotation: number }
+
+// Chaises face à la table, sur ses deux grands côtés (z). Une chaise « regarde »
+// vers +z quand sa rotation est nulle.
+function chairsOf(table: TableView): Chair[] {
+  const xs = table.seats === 4 ? [-0.45, 0.45] : [0]
+  return xs.flatMap((x) => [
+    { x, z: -0.75, rotation: 0 },
+    { x, z: 0.75, rotation: Math.PI },
+  ])
+}
+
+// Table et chaises en primitives : affichées pendant le chargement des modèles,
+// ou à leur place s'ils ne se chargent pas.
+function PrimitiveFurniture({ table }: { table: TableView }) {
+  const [width, depth] = TABLE_SIZE[table.shape]
+  return (
+    <group>
+      <mesh position-y={TABLE_HEIGHT}>
+        <boxGeometry args={[width, 0.06, depth]} />
+        <meshStandardMaterial color={WOOD} />
+      </mesh>
+      <mesh position-y={TABLE_HEIGHT / 2}>
+        <boxGeometry args={[width * 0.6, TABLE_HEIGHT, 0.1]} />
+        <meshStandardMaterial color={CHAIR} />
+      </mesh>
+      {chairsOf(table).map((chair) => (
+        <group key={`${chair.x}:${chair.z}`} position={[chair.x, 0, chair.z]} rotation-y={chair.rotation}>
+          <mesh position-y={0.45}>
+            <boxGeometry args={[0.42, 0.05, 0.42]} />
+            <meshStandardMaterial color={CHAIR} />
+          </mesh>
+          <mesh position={[0, 0.7, -0.19]}>
+            <boxGeometry args={[0.42, 0.5, 0.05]} />
+            <meshStandardMaterial color={CHAIR} />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  )
+}
+
+// Mobilier du Furniture Kit : table nappée pour 4, petite table en bois pour 2
+// (la table du kit, raccourcie).
+function KitFurniture({ table }: { table: TableView }) {
+  return (
+    <group>
+      {table.shape === 'long' ? (
+        <KitModel name="tableCloth" />
+      ) : (
+        <KitModel name="table" stretch={[TABLE_SIZE.small[0] / TABLE_SIZE.long[0], 1, 1]} />
+      )}
+      {chairsOf(table).map((chair) => (
+        <KitModel
+          key={`${chair.x}:${chair.z}`}
+          name="chair"
+          position={[chair.x, 0, chair.z]}
+          rotation-y={chair.rotation + CHAIR_MODEL_ROTATION}
+        />
+      ))}
+    </group>
+  )
+}
+
 type DiningTableProps = {
   table: TableView
   onSelect: (tableNumber: number) => void
 }
 
-// Chaises autour de la table : face à face pour 2 places, sur les 4 côtés pour 4.
-function chairPositions(seats: TableView['seats']): { x: number; z: number; rotation: number }[] {
-  const sides = [
-    { x: -0.85, z: 0, rotation: Math.PI / 2 },
-    { x: 0.85, z: 0, rotation: -Math.PI / 2 },
-    { x: 0, z: -0.85, rotation: 0 },
-    { x: 0, z: 0.85, rotation: Math.PI },
-  ]
-  return sides.slice(0, seats)
-}
-
 /**
- * Table du plan, en primitives (remplacées plus tard par des modèles .glb).
- * L'anneau au sol porte l'état ; le détail est dans l'étiquette HTML (TableLabel).
+ * Table du plan : mobilier, anneau d'état au sol et zone de clic. Le détail
+ * (numéro, attente, messages) est dans l'étiquette HTML (TableLabel).
  */
 export function DiningTable({ table, onSelect }: DiningTableProps) {
   const style = TABLE_STATE_STYLES[table.state]
   const highlighted = table.state !== 'free' && table.state !== 'unknown'
+  const [innerRadius, outerRadius] = RING_RADIUS[table.shape]
+  const [width] = TABLE_SIZE[table.shape]
 
   const handleClick = (event: ThreeEvent<MouseEvent>) => {
     event.stopPropagation()
@@ -48,43 +122,20 @@ export function DiningTable({ table, onSelect }: DiningTableProps) {
     >
       {highlighted && (
         <mesh rotation-x={-Math.PI / 2} position-y={0.01}>
-          <ringGeometry args={[0.95, 1.2, 48]} />
+          <ringGeometry args={[innerRadius, outerRadius, 48]} />
           <meshBasicMaterial color={style.color} />
         </mesh>
       )}
 
-      {table.shape === 'round' ? (
-        <mesh position-y={TABLE_HEIGHT}>
-          <cylinderGeometry args={[0.55, 0.55, 0.06, 32]} />
-          <meshStandardMaterial color={WOOD} />
-        </mesh>
-      ) : (
-        <mesh position-y={TABLE_HEIGHT}>
-          <boxGeometry args={[1.1, 0.06, 1.1]} />
-          <meshStandardMaterial color={WOOD} />
-        </mesh>
-      )}
-      <mesh position-y={TABLE_HEIGHT / 2}>
-        <cylinderGeometry args={[0.06, 0.08, TABLE_HEIGHT, 12]} />
-        <meshStandardMaterial color={CHAIR} />
-      </mesh>
-
-      {chairPositions(table.seats).map((chair) => (
-        <group key={`${chair.x}:${chair.z}`} position={[chair.x, 0, chair.z]} rotation-y={chair.rotation}>
-          <mesh position-y={0.45}>
-            <boxGeometry args={[0.42, 0.05, 0.42]} />
-            <meshStandardMaterial color={CHAIR} />
-          </mesh>
-          <mesh position={[0, 0.7, -0.19]}>
-            <boxGeometry args={[0.42, 0.5, 0.05]} />
-            <meshStandardMaterial color={CHAIR} />
-          </mesh>
-        </group>
-      ))}
+      <ViewErrorBoundary fallback={<PrimitiveFurniture table={table} />}>
+        <Suspense fallback={<PrimitiveFurniture table={table} />}>
+          <KitFurniture table={table} />
+        </Suspense>
+      </ViewErrorBoundary>
 
       {/* Zone de clic plus large que la table, utile au doigt sur mobile */}
       <mesh position-y={0.5}>
-        <boxGeometry args={[2, 1, 2]} />
+        <boxGeometry args={[width + 0.6, 1, 2]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
     </group>

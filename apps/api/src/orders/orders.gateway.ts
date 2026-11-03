@@ -19,6 +19,7 @@ import {
   type OrderStatusUpdatedEvent,
   type OrderSyncAck,
 } from '@app/shared';
+import { TablesGateway } from '../floor-plan/tables.gateway.js';
 import { validationFailure, withAck } from '../realtime/ack.js';
 import {
   GATEWAY_OPTIONS,
@@ -43,7 +44,10 @@ export class OrdersGateway {
   @WebSocketServer()
   private server!: RealtimeServer;
 
-  constructor(private readonly orders: OrdersService) {}
+  constructor(
+    private readonly orders: OrdersService,
+    private readonly tables: TablesGateway,
+  ) {}
 
   @SubscribeMessage(OrderSocketEvent.CREATE)
   async onCreate(
@@ -55,11 +59,12 @@ export class OrdersGateway {
 
     const user = client.data.user;
     return withAck(this.logger, async () => {
-      const { order, event } = await this.orders.createOrGet(
+      const { order, event, tableEvent } = await this.orders.createOrGet(
         { ...parsed.data, restaurantId: user.restaurantId },
         user.id,
       );
       if (event) this.publishCreated(event);
+      if (tableEvent) this.tables.publishStatusUpdated(user.restaurantId, tableEvent);
       return { accepted: true as const, orderId: order.id };
     });
   }

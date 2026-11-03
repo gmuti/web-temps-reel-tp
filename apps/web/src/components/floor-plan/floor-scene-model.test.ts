@@ -1,4 +1,4 @@
-import { orderChatChannel, type FloorTable, type Order } from '@app/shared'
+import { orderChatChannel, type FloorTable, type Order, type TableState } from '@app/shared'
 import { describe, expect, it } from 'vitest'
 import { buildScene, isLate, placeStaff } from './floor-scene-model'
 
@@ -122,5 +122,43 @@ describe('placeStaff', () => {
     const [firstCook, , secondCook] = staff
     expect(secondCook.z).toBe(firstCook.z)
     expect(secondCook.x).not.toBe(firstCook.x)
+  })
+})
+
+describe("buildScene avec l'occupation des tables", () => {
+  const occupancy = (number: number, status: TableState['status'], guests: number | null = null): TableState => ({
+    number,
+    status,
+    guests,
+    statusChangedAt: new Date(Date.UTC(2026, 10, 3, 11, 30)),
+    version: 1,
+  })
+
+  it("montre l'occupation d'une table sans commande en cours", () => {
+    const scene = buildScene(TABLES, [], {}, 'RESPONSABLE', {
+      1: occupancy(1, 'OCCUPEE', 3),
+      2: occupancy(2, 'A_DEBARRASSER'),
+    })
+    expect(scene.tables.map((table) => table.state)).toEqual(['occupied', 'to-clear'])
+    expect(scene.tables[0].occupancy?.guests).toBe(3)
+    expect(scene.tables[1].since).toEqual(new Date(Date.UTC(2026, 10, 3, 11, 30)))
+  })
+
+  it("fait passer les commandes avant l'occupation", () => {
+    const scene = buildScene(TABLES, [order(1, 'PRETE')], {}, 'RESPONSABLE', { 1: occupancy(1, 'OCCUPEE') })
+    expect(scene.tables[0].state).toBe('ready')
+  })
+
+  it('renseigne un serveur sur les tables de ses collègues, sans leurs commandes', () => {
+    const scene = buildScene(TABLES, [], {}, 'WAITER', { 1: occupancy(1, 'OCCUPEE'), 2: occupancy(2, 'LIBRE') })
+    expect(scene.tables.map((table) => table.state)).toEqual(['occupied', 'free'])
+    expect(scene.tables[0].orders).toEqual([])
+  })
+
+  it('signale une table à débarrasser depuis plus de 5 minutes', () => {
+    const now = new Date(Date.UTC(2026, 10, 3, 12, 0))
+    expect(isLate('to-clear', new Date(now.getTime() - 4 * 60_000), now)).toBe(false)
+    expect(isLate('to-clear', new Date(now.getTime() - 5 * 60_000), now)).toBe(true)
+    expect(isLate('occupied', new Date(now.getTime() - 120 * 60_000), now)).toBe(false)
   })
 })

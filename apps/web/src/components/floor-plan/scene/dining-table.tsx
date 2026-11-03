@@ -92,6 +92,49 @@ function KitFurniture({ table }: { table: TableView }) {
   )
 }
 
+// Tenues des clients installés, alternées d'une chaise à l'autre.
+const GUEST_COLORS = ['#0ea5e9', '#f43f5e', '#84cc16', '#f59e0b']
+const SKIN = '#e0b48f'
+
+// Clients assis, un par couvert (toutes les places si le nombre n'est pas connu).
+function SeatedGuests({ table }: { table: TableView }) {
+  const chairs = chairsOf(table)
+  const count = Math.min(table.occupancy?.guests ?? chairs.length, chairs.length)
+  return chairs.slice(0, count).map((chair, index) => (
+    // Légèrement avancés vers la table depuis le centre de la chaise.
+    <group key={`${chair.x}:${chair.z}`} position={[chair.x, 0, chair.z * 0.9]}>
+      <mesh position-y={0.82}>
+        <capsuleGeometry args={[0.15, 0.36, 4, 12]} />
+        <meshStandardMaterial color={GUEST_COLORS[index % GUEST_COLORS.length]} />
+      </mesh>
+      <mesh position-y={1.2}>
+        <sphereGeometry args={[0.13, 16, 12]} />
+        <meshStandardMaterial color={SKIN} />
+      </mesh>
+    </group>
+  ))
+}
+
+// Assiettes et verres laissés par les clients partis.
+function DirtyDishes({ table }: { table: TableView }) {
+  const xs = table.seats >= 4 ? [-0.45, 0.45] : [0]
+  return xs.flatMap((x) =>
+    [-0.22, 0.22].map((z) => (
+      <group key={`${x}:${z}`} position={[x, TABLE_HEIGHT + 0.02, z]}>
+        {/* Assiette blanche (bien visible sur le bois clair) et restes du repas */}
+        <mesh>
+          <cylinderGeometry args={[0.16, 0.12, 0.03, 20]} />
+          <meshStandardMaterial color="#ffffff" />
+        </mesh>
+        <mesh position={[0.03, 0.03, -0.02]} scale={[1, 0.4, 1]}>
+          <sphereGeometry args={[0.06, 12, 8]} />
+          <meshStandardMaterial color="#92400e" />
+        </mesh>
+      </group>
+    )),
+  )
+}
+
 type DiningTableProps = {
   table: TableView
   onSelect: (tableNumber: number) => void
@@ -132,6 +175,9 @@ export function DiningTable({ table, onSelect }: DiningTableProps) {
           <KitFurniture table={table} />
         </Suspense>
       </ViewErrorBoundary>
+
+      {table.occupancy?.status === 'OCCUPEE' && <SeatedGuests table={table} />}
+      {table.occupancy?.status === 'A_DEBARRASSER' && <DirtyDishes table={table} />}
 
       {/* Zone de clic plus large que la table, utile au doigt sur mobile */}
       <mesh position-y={0.5}>

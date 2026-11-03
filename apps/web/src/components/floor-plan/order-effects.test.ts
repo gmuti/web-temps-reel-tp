@@ -1,6 +1,12 @@
 import type { FloorTable, Order, OrderJournalEvent } from '@app/shared'
 import { describe, expect, it } from 'vitest'
-import { admitEffect, EFFECT_WINDOW_MS, effectOfEvent, MAX_EFFECTS_PER_WINDOW } from './order-effects'
+import {
+  admitEffect,
+  EFFECT_WINDOW_MS,
+  effectOfEvent,
+  effectOfTableEvent,
+  MAX_EFFECTS_PER_WINDOW,
+} from './order-effects'
 
 const TABLES: FloorTable[] = [{ number: 4, x: 6, z: -1, shape: 'small', seats: 2 }]
 const ORDER_ID = '00000000-0000-4000-8000-000000000001'
@@ -89,5 +95,29 @@ describe('admitEffect', () => {
   it('accepte de nouveau une fois la fenêtre passée', () => {
     const recent = Array.from({ length: MAX_EFFECTS_PER_WINDOW }, (_, i) => 1000 + i)
     expect(admitEffect(recent, 1000 + EFFECT_WINDOW_MS + MAX_EFFECTS_PER_WINDOW)).toHaveLength(1)
+  })
+})
+
+describe('effectOfTableEvent', () => {
+  const tableEvent = (number: number, status: 'LIBRE' | 'OCCUPEE' | 'A_DEBARRASSER') => ({
+    number,
+    status,
+    previousStatus: 'LIBRE' as const,
+    guests: null,
+    statusChangedAt: date,
+    version: 1,
+    updatedBy: USER_ID,
+  })
+
+  it('fait pulser la table à la couleur de sa nouvelle occupation', () => {
+    const occupied = effectOfTableEvent(tableEvent(4, 'OCCUPEE'), TABLES)
+    const toClear = effectOfTableEvent(tableEvent(4, 'A_DEBARRASSER'), TABLES)
+    expect(occupied).toMatchObject({ kind: 'pulse', at: [6, 0.02, -1] })
+    expect(toClear).toMatchObject({ kind: 'pulse' })
+    expect(toClear).not.toEqual(occupied)
+  })
+
+  it('ignore une table absente du plan', () => {
+    expect(effectOfTableEvent(tableEvent(42, 'OCCUPEE'), TABLES)).toBeNull()
   })
 })

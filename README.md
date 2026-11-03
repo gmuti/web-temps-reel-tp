@@ -185,6 +185,14 @@ restaurant a un plan, une commande (REST ou Socket.IO) pour une table qui n'y
 figure pas est refusée avec `UNKNOWN_TABLE`. Un restaurant sans plan accepte
 tout numéro de table, comme avant.
 
+Chaque table a une occupation : `LIBRE` → `OCCUPEE` (clients installés, avec le
+nombre de couverts) → `A_DEBARRASSER` (clients partis) → `LIBRE`. Serveurs et
+responsable la font évoluer ; la cuisine et le manager la voient. Une commande
+prise à une table libre l'occupe automatiquement, et une table ne passe pas « à
+débarrasser » tant qu'elle a des commandes en cours (`TABLE_HAS_ACTIVE_ORDERS`).
+L'occupation est visible par tout le restaurant : elle ne dit rien des
+commandes, un serveur voit donc qu'une table de son collègue est occupée.
+
 ### Canaux de chat
 
 | Canal | Accès |
@@ -211,6 +219,7 @@ jeton.
 | `POST` | `/auth/login` | Connexion, renvoie le jeton |
 | `GET` | `/dishes` | Carte du restaurant |
 | `GET` | `/floor-plan` | Plan de salle : `{ tables: [{ number, x, z, shape, seats }] }` |
+| `PATCH` | `/floor-plan/tables/:number/status` | Occupation d'une table (`{ expectedStatus, requestedStatus, guests? }`) |
 | `GET` | `/orders?status=` | Commandes visibles (en cours par défaut) |
 | `POST` | `/orders` | Création d'une commande (idempotente via `clientOrderId`) |
 | `PATCH` | `/orders/:orderId/status` | Demande de transition |
@@ -235,6 +244,8 @@ Commandes envoyées par le client, avec accusé de réception
 | `chat:channel:join` | `{ channelId }` | `messages` (50 derniers) |
 | `chat:channel:leave` | `{ channelId }` | — |
 | `chat:message:create` | `{ channelId, clientMessageId, content }` | `messageId` |
+| `table:sync` | `{}` | `tables` (occupation de toutes les tables) |
+| `table:status:update` | `{ tableNumber, expectedStatus, requestedStatus, guests? }` | `tableNumber` |
 
 Événements publiés par le serveur :
 
@@ -244,6 +255,7 @@ Commandes envoyées par le client, avec accusé de réception
 | `order:status-updated` | Idem |
 | `chat:message:created` | Membres du canal |
 | `presence:updated` | Tout le restaurant |
+| `table:status-updated` | Tout le restaurant |
 
 Salles : `restaurant:<id>` (canal Général et présence),
 `restaurant:<id>:kitchen`, `restaurant:<id>:service`,
@@ -266,6 +278,11 @@ L'identifiant croissant de l'entrée sert d'`eventId`.
    appliqués dans l'ordre ; un événement déjà appliqué est ignoré.
 
 Le chat recharge l'historique de chaque canal ouvert à la reconnexion.
+
+L'occupation des tables n'a pas de journal : l'état est petit et chaque table
+porte une `version`. À chaque (re)connexion, le client recharge l'instantané
+`table:sync` et garde, table par table, l'état de version la plus haute, qu'il
+vienne de l'instantané ou d'un événement.
 
 ## Développement sans Docker
 

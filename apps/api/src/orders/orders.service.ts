@@ -13,6 +13,7 @@ import type {
   OrderJournalEvent,
   OrderStatus,
   OrderStatusUpdatedEvent,
+  TableStatusUpdatedEvent,
   UpdateOrderStatusInput,
   UserRole,
 } from '@app/shared';
@@ -26,6 +27,7 @@ import {
   OrderStatus as OrderStatusValues,
 } from '@app/shared';
 import type { Prisma } from '../generated/prisma/client.js';
+import { TablesService } from '../floor-plan/tables.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 // Celui qui consulte ou modifie : détermine la visibilité des commandes.
@@ -42,7 +44,10 @@ type OrderWithItems = Prisma.OrderGetPayload<{ include: typeof withItems }>;
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tables: TablesService,
+  ) {}
 
   /**
    * Le tableau de commandes (cf. sujet — `GET /orders`). Par défaut, ne renvoie
@@ -75,13 +80,19 @@ export class OrdersService {
   async createOrGet(
     input: CreateOrderInput,
     waiterId: string,
-  ): Promise<{ order: Order; created: boolean; event: OrderCreatedEvent | null }> {
+  ): Promise<{
+    order: Order;
+    created: boolean;
+    event: OrderCreatedEvent | null;
+    // Occupation de la table, si la commande a été prise à une table libre.
+    tableEvent: TableStatusUpdatedEvent | null;
+  }> {
     const existing = await this.prisma.order.findUnique({
       where: { clientOrderId: input.clientOrderId },
       include: withItems,
     });
     if (existing) {
-      return { order: this.toOrder(existing), created: false, event: null };
+      return { order: this.toOrder(existing), created: false, event: null, tableEvent: null };
     }
 
     await this.assertTableOnPlan(input.restaurantId, input.tableNumber);
@@ -133,7 +144,13 @@ export class OrdersService {
           payload: payload as unknown as Prisma.InputJsonValue,
         },
       });
-      return { order, created: true, event: { ...payload, eventId: journal.id } };
+      const tableEvent = await this.tables.occupyIfFree(
+        tx,
+        input.restaurantId,
+        input.tableNumber,
+        waiterId,
+      );
+      return { order, created: true, event: { ...payload, eventId: journal.id }, tableEvent };
     });
   }
 

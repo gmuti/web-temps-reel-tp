@@ -1,0 +1,8 @@
+-- CreateEnum
+CREATE TYPE "TableStatus" AS ENUM ('LIBRE', 'OCCUPEE', 'A_DEBARRASSER');
+
+-- AlterTable
+ALTER TABLE "DiningTable" ADD COLUMN     "guests" INTEGER,
+ADD COLUMN     "status" "TableStatus" NOT NULL DEFAULT 'LIBRE',
+ADD COLUMN     "statusChangedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN     "version" INTEGER NOT NULL DEFAULT 0;

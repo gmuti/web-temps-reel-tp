@@ -23,6 +23,7 @@ import { CurrentUser } from '../auth/current-user.decorator.js';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import type { JwtPayload } from '../auth/jwt-payload.type.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
+import { TablesGateway } from '../floor-plan/tables.gateway.js';
 import { OrdersGateway } from './orders.gateway.js';
 import { OrdersService, type OrderViewer } from './orders.service.js';
 
@@ -32,6 +33,7 @@ export class OrdersController {
   constructor(
     private readonly orders: OrdersService,
     private readonly gateway: OrdersGateway,
+    private readonly tables: TablesGateway,
   ) {}
 
   // GET /orders?status=... — restaurant déduit de l'utilisateur authentifié.
@@ -51,8 +53,12 @@ export class OrdersController {
     @Body(new ZodValidationPipe(createOrderRequestSchema)) body: CreateOrderRequest,
   ) {
     const { restaurantId } = this.viewer(user);
-    const { order, event } = await this.orders.createOrGet({ ...body, restaurantId }, user.sub);
+    const { order, event, tableEvent } = await this.orders.createOrGet(
+      { ...body, restaurantId },
+      user.sub,
+    );
     if (event) this.gateway.publishCreated(event);
+    if (tableEvent) this.tables.publishStatusUpdated(restaurantId, tableEvent);
     return order;
   }
 

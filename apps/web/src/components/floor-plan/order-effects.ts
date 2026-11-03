@@ -1,4 +1,10 @@
-import { OrderSocketEvent, type FloorTable, type Order, type OrderJournalEvent } from '@app/shared'
+import {
+  OrderSocketEvent,
+  type FloorTable,
+  type Order,
+  type OrderJournalEvent,
+  type TableStatusUpdatedEvent,
+} from '@app/shared'
 import {
   COUNTER_HEIGHT,
   KITCHEN_COUNTER_Z,
@@ -88,6 +94,21 @@ export function effectOfEvent(
     default:
       return null
   }
+}
+
+// Une table débarrassée redevient disponible : vert, plutôt que le gris discret de « libre ».
+const TABLE_FREED_COLOR = '#10b981'
+
+const OCCUPANCY_PULSE_COLOR: Record<TableStatusUpdatedEvent['status'], string> = {
+  OCCUPEE: TABLE_STATE_STYLES.occupied.color,
+  A_DEBARRASSER: TABLE_STATE_STYLES['to-clear'].color,
+  LIBRE: TABLE_FREED_COLOR,
+}
+
+// Changement d'occupation : un anneau pulse sous la table, à la couleur du nouvel état.
+export function effectOfTableEvent(event: TableStatusUpdatedEvent, tables: readonly FloorTable[]): SceneEffect | null {
+  const table = tables.find((candidate) => candidate.number === event.number)
+  return table ? { kind: 'pulse', color: OCCUPANCY_PULSE_COLOR[event.status], at: [table.x, 0.02, table.z] } : null
 }
 
 // Garde-fou des animations : au-delà de quelques effets rapprochés (rafale,

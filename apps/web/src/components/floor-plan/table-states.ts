@@ -9,6 +9,8 @@ export const TABLE_STATE_STYLES: Record<TableVisualState, { label: string; color
     color: '#cbd5e1',
     badgeClass: 'bg-background/80 text-muted-foreground',
   },
+  occupied: { label: 'Occupée', color: '#64748b', badgeClass: 'bg-slate-600 text-white' },
+  'to-clear': { label: 'À débarrasser', color: '#9333ea', badgeClass: 'bg-purple-600 text-white' },
   'to-validate': { label: 'À valider', color: '#f59e0b', badgeClass: 'bg-amber-500 text-white animate-pulse' },
   validated: { label: 'Validée', color: '#3b82f6', badgeClass: 'bg-blue-500 text-white' },
   cooking: { label: 'En préparation', color: '#f97316', badgeClass: 'bg-orange-500 text-white' },

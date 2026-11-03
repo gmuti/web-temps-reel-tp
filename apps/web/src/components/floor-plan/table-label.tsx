@@ -1,4 +1,4 @@
-import { ClockIcon, MessageSquareIcon } from 'lucide-react'
+import { ClockIcon, MessageSquareIcon, UsersIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { isLate, type TableView } from './floor-scene-model'
 import { minutesSince, TABLE_STATE_STYLES } from './table-states'
@@ -17,14 +17,21 @@ export function TableLabel({ table, now, onSelect }: TableLabelProps) {
   const style = TABLE_STATE_STYLES[table.state]
   const count = table.orders.length
   const late = isLate(table.state, table.since, now)
+  const guests = table.occupancy?.status === 'OCCUPEE' ? table.occupancy.guests : null
+  const ariaLabel = [
+    `Table ${table.number} : ${style.label}`,
+    count > 0 && `${count} commande${count > 1 ? 's' : ''}`,
+    guests !== null && `${guests} couvert${guests > 1 ? 's' : ''}`,
+    late && 'en retard',
+  ]
+    .filter(Boolean)
+    .join(', ')
 
   return (
     <button
       type="button"
       onClick={() => onSelect(table.number)}
-      aria-label={`Table ${table.number} : ${style.label}${count > 0 ? `, ${count} commande${count > 1 ? 's' : ''}` : ''}${
-        late ? ', en retard' : ''
-      }`}
+      aria-label={ariaLabel}
       className={cn(
         'pointer-events-auto flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap shadow-sm',
         style.badgeClass,
@@ -34,6 +41,12 @@ export function TableLabel({ table, now, onSelect }: TableLabelProps) {
     >
       T{table.number}
       {count > 1 && <span className="rounded-full bg-black/20 px-1.5">{count}</span>}
+      {guests !== null && (
+        <span className="flex items-center gap-0.5 font-normal" aria-hidden>
+          <UsersIcon className="size-3" />
+          {guests}
+        </span>
+      )}
       {table.since && (
         <span className="flex items-center gap-0.5 font-normal">
           <ClockIcon className="size-3" />

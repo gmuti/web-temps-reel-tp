@@ -1,4 +1,12 @@
-import type { ChatAuthor, FloorTable, Order, OrderJournalEvent, UserRole } from '@app/shared'
+import type {
+  ChatAuthor,
+  FloorTable,
+  Order,
+  OrderJournalEvent,
+  TableState,
+  TableStatusUpdatedEvent,
+  UserRole,
+} from '@app/shared'
 import { Canvas } from '@react-three/fiber'
 import { LocateFixedIcon, Rotate3dIcon, ScanIcon } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -9,7 +17,7 @@ import type { ConnectionState } from '@/lib/use-realtime-socket'
 import { Button } from '@/components/ui/button'
 import { KITCHEN_COUNTER_Z, KITCHEN_LABEL_POSITION, PASS_COUNTER, PASS_LABEL_POSITION } from './floor-plan-data'
 import { buildScene, placeStaff } from './floor-scene-model'
-import { admitEffect, effectOfEvent } from './order-effects'
+import { admitEffect, effectOfEvent, effectOfTableEvent, type SceneEffect } from './order-effects'
 import { LabelProjector, SceneLabel, type LabelAnchors } from './scene-labels'
 import { TableLabel } from './table-label'
 import { CameraRig, type CameraFocus, type CameraMode } from './scene/camera-rig'
@@ -35,6 +43,8 @@ function readCameraMode(): CameraMode {
 
 export type FloorPlan3DProps = {
   orders: Order[]
+  // Occupation des tables, par numéro (useTablesRealtime).
+  tableStates: Record<number, TableState>
   unread: Record<string, number>
   // Personnes connectées (présence du chat).
   online: ChatAuthor[]
@@ -48,6 +58,7 @@ export type FloorPlan3DProps = {
   onContextLost: () => void
   // Événements reçus en direct (pas ceux d'un rattrapage), pour les animations.
   subscribeToOrderEvents: (listener: (entry: OrderJournalEvent) => void) => () => void
+  subscribeToTableEvents: (listener: (event: TableStatusUpdatedEvent) => void) => () => void
 }
 
 /**
@@ -58,6 +69,7 @@ export type FloorPlan3DProps = {
  */
 export default function FloorPlan3D({
   orders,
+  tableStates,
   unread,
   online,
   role,
@@ -66,6 +78,7 @@ export default function FloorPlan3D({
   onSelectTable,
   onContextLost,
   subscribeToOrderEvents,
+  subscribeToTableEvents,
 }: FloorPlan3DProps) {
   // Tables du plan de salle, chargées à l'ouverture du plan (null pendant le chargement).
   const [tables, setTables] = useState<FloorTable[] | null>(null)
@@ -81,7 +94,10 @@ export default function FloorPlan3D({
     }
   }, [])
 
-  const scene = useMemo(() => buildScene(tables ?? [], orders, unread, role), [tables, orders, unread, role])
+  const scene = useMemo(
+    () => buildScene(tables ?? [], orders, unread, role, tableStates),
+    [tables, orders, unread, role, tableStates],
+  )
   const now = useNow(15_000)
   const [cameraMode, setCameraMode] = useState<CameraMode>(readCameraMode)
   const [resetSignal, setResetSignal] = useState(0)
@@ -106,19 +122,24 @@ export default function FloorPlan3D({
     tablesRef.current = tables
   }, [orders, tables])
 
+  const playEffect = useCallback((effect: SceneEffect | null) => {
+    if (!effect || document.hidden || prefersReducedMotion()) return
+    const admitted = admitEffect(recentEffectsRef.current, performance.now())
+    if (!admitted) return
+    recentEffectsRef.current = admitted
+    const id = nextEffectIdRef.current++
+    setEffects((current) => [...current, { ...effect, id }])
+  }, [])
+
   useEffect(
     () =>
-      subscribeToOrderEvents((entry) => {
-        if (document.hidden || prefersReducedMotion()) return
-        const effect = effectOfEvent(entry, tablesRef.current ?? [], ordersRef.current)
-        if (!effect) return
-        const admitted = admitEffect(recentEffectsRef.current, performance.now())
-        if (!admitted) return
-        recentEffectsRef.current = admitted
-        const id = nextEffectIdRef.current++
-        setEffects((current) => [...current, { ...effect, id }])
-      }),
-    [subscribeToOrderEvents],
+      subscribeToOrderEvents((entry) => playEffect(effectOfEvent(entry, tablesRef.current ?? [], ordersRef.current))),
+    [subscribeToOrderEvents, playEffect],
+  )
+
+  useEffect(
+    () => subscribeToTableEvents((event) => playEffect(effectOfTableEvent(event, tablesRef.current ?? []))),
+    [subscribeToTableEvents, playEffect],
   )
 
   const removeEffect = useCallback((id: number) => setEffects((current) => current.filter((e) => e.id !== id)), [])

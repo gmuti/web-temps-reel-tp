@@ -1,4 +1,4 @@
-import type { Order } from '@app/shared'
+import type { Order, TableStatus } from '@app/shared'
 
 // Libellés des statuts, partagés par les vues des commandes et leurs notifications.
 export const STATUS_LABELS: Record<Order['status'], string> = {
@@ -8,4 +8,11 @@ export const STATUS_LABELS: Record<Order['status'], string> = {
   PRETE: 'Prête',
   SERVIE: 'Servie',
   ANNULEE: 'Annulée',
+}
+
+// Libellés de l'occupation des tables.
+export const TABLE_STATUS_LABELS: Record<TableStatus, string> = {
+  LIBRE: 'Libre',
+  OCCUPEE: 'Occupée',
+  A_DEBARRASSER: 'À débarrasser',
 }

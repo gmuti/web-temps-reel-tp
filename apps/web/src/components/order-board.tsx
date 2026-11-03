@@ -1,13 +1,23 @@
-import { canSeeAllOrders, OrderStatusErrorCode, type Order, type OrderJournalEvent, type User } from '@app/shared'
+import {
+  canSeeAllOrders,
+  OrderStatusErrorCode,
+  type Order,
+  type OrderJournalEvent,
+  type TableState,
+  type TableStatus,
+  type TableStatusUpdatedEvent,
+  type User,
+} from '@app/shared'
 import { BoxIcon, KanbanIcon } from 'lucide-react'
 import { lazy, Suspense, useCallback, useState } from 'react'
 import { toast } from 'sonner'
 import { useAuth } from '@/lib/auth-context'
 import { createEventChannel } from '@/lib/event-channel'
 import { useChat } from '@/lib/use-chat'
-import { STATUS_LABELS } from '@/lib/order-status'
+import { STATUS_LABELS, TABLE_STATUS_LABELS } from '@/lib/order-status'
 import { useOrdersRealtime } from '@/lib/use-orders-realtime'
 import { AckError, useRealtimeSocket, type ConnectionState } from '@/lib/use-realtime-socket'
+import { useTablesRealtime } from '@/lib/use-tables-realtime'
 import { isWebGLAvailable } from '@/lib/webgl'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -50,8 +60,15 @@ export function OrderBoard({ user }: { user: User }) {
   const { orders, resync, createOrder, updateStatus } = useOrdersRealtime(socket, {
     onLiveEvent: liveOrderEvents.emit,
   })
+  const [liveTableEvents] = useState(() => createEventChannel<TableStatusUpdatedEvent>())
+  const {
+    tables: tableStates,
+    resync: resyncTables,
+    updateTableStatus,
+  } = useTablesRealtime(socket, { onLiveEvent: liveTableEvents.emit })
   const chat = useChat(socket, user.role)
   const [pendingOrderId, setPendingOrderId] = useState<string | null>(null)
+  const [pendingTableNumber, setPendingTableNumber] = useState<number | null>(null)
   const badge = CONNECTION_BADGES[connection]
   // Sans WebGL, seul le kanban est proposé.
   const [canShowPlan] = useState(isWebGLAvailable)
@@ -92,6 +109,25 @@ export function OrderBoard({ user }: { user: User }) {
       }
     } finally {
       setPendingOrderId(null)
+    }
+  }
+
+  // Même principe que pour les commandes : l'état ne change qu'à réception de
+  // l'événement `table:status-updated` ; un conflit recharge l'occupation.
+  const handleTableStatusChange = async (table: TableState, requestedStatus: TableStatus, guests?: number) => {
+    setPendingTableNumber(table.number)
+    try {
+      await updateTableStatus(table, requestedStatus, guests)
+      toast.success(`Table ${table.number} : ${TABLE_STATUS_LABELS[requestedStatus]}`)
+    } catch (err) {
+      if (err instanceof AckError && err.errorCode === OrderStatusErrorCode.STATUS_CONFLICT) {
+        toast.warning(`Table ${table.number} : ${err.message} Plan actualisé.`)
+        await resyncTables()
+      } else {
+        toast.error(err instanceof Error ? err.message : 'Impossible de modifier la table.')
+      }
+    } finally {
+      setPendingTableNumber(null)
     }
   }
 
@@ -172,6 +208,7 @@ export function OrderBoard({ user }: { user: User }) {
               >
                 <FloorPlan3D
                   orders={orders}
+                  tableStates={tableStates}
                   unread={chat.unread}
                   online={chat.online}
                   role={user.role}
@@ -180,6 +217,7 @@ export function OrderBoard({ user }: { user: User }) {
                   onSelectTable={setSelectedTable}
                   onContextLost={fallBackToKanban}
                   subscribeToOrderEvents={liveOrderEvents.subscribe}
+                  subscribeToTableEvents={liveTableEvents.subscribe}
                 />
               </Suspense>
             </ViewErrorBoundary>
@@ -211,12 +249,15 @@ export function OrderBoard({ user }: { user: User }) {
       <TableDetailDialog
         tableNumber={selectedTable}
         orders={orders}
+        occupancy={selectedTable !== null ? (tableStates[selectedTable] ?? null) : null}
         role={user.role}
         pendingOrderId={pendingOrderId}
+        isTablePending={pendingTableNumber === selectedTable}
         onClose={() => setSelectedTable(null)}
         onStatusChange={handleStatusChange}
         onOpenDiscussion={handleOpenDiscussionFromTable}
         onCreateOrder={createOrder}
+        onTableStatusChange={handleTableStatusChange}
       />
     </div>
   )

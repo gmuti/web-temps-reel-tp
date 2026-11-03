@@ -4,21 +4,27 @@ import {
   type ChatAuthor,
   type FloorTable,
   type Order,
+  type TableState,
   type UserRole,
 } from '@app/shared'
 import { KITCHEN_COUNTER_Z, PASS_COUNTER, ROOM } from './floor-plan-data'
 
 /**
- * État visuel d'une table, déduit de ses commandes en cours.
- * `unknown` : un serveur ne voit que ses propres commandes, il ne peut donc pas
- * savoir si une table sans commande de sa part est libre.
+ * État visuel d'une table : d'abord celui de sa commande la plus urgente, sinon
+ * son occupation (occupée, à débarrasser, libre).
+ * `unknown` : occupation pas encore chargée, et un serveur ne voit que ses
+ * propres commandes — il ne peut pas savoir si la table est libre.
  */
-export type TableVisualState = 'free' | 'unknown' | 'to-validate' | 'validated' | 'cooking' | 'ready'
+export type TableVisualState =
+  'free' | 'unknown' | 'occupied' | 'to-clear' | 'to-validate' | 'validated' | 'cooking' | 'ready'
 
 export type TableView = FloorTable & {
   state: TableVisualState
   orders: Order[]
-  // Entrée dans le statut le plus urgent (la plus ancienne commande de ce statut).
+  // Occupation de la table (null tant qu'elle n'est pas chargée).
+  occupancy: TableState | null
+  // Entrée dans l'état affiché : la plus ancienne commande du statut le plus
+  // urgent, ou le dernier changement d'occupation.
   since: Date | null
   // Messages non lus dans les discussions des commandes de la table.
   unread: number
@@ -59,6 +65,14 @@ export const LATE_AFTER_MINUTES: Partial<Record<TableVisualState, number>> = {
   'to-validate': 5,
   validated: 10,
   cooking: 20,
+  // Une table à débarrasser bloque l'installation des clients suivants.
+  'to-clear': 5,
+}
+
+const STATE_OF_OCCUPANCY: Record<TableState['status'], TableVisualState> = {
+  LIBRE: 'free',
+  OCCUPEE: 'occupied',
+  A_DEBARRASSER: 'to-clear',
 }
 
 export function isLate(state: TableVisualState, since: Date | null, now: Date): boolean {
@@ -76,6 +90,7 @@ export function buildScene(
   orders: readonly Order[],
   unread: Record<string, number>,
   viewerRole: UserRole,
+  occupancy: Readonly<Record<number, TableState>> = {},
 ): SceneModel {
   const active = orders.filter((order) => URGENCY[order.status] > 0)
   const planNumbers = new Set(tables.map((table) => table.number))
@@ -84,15 +99,20 @@ export function buildScene(
     const tableOrders = active.filter((order) => order.tableNumber === table.number).sort(byUpdatedAt)
     const top = Math.max(0, ...tableOrders.map((order) => URGENCY[order.status]))
     const mostUrgent = tableOrders.find((order) => URGENCY[order.status] === top)
+    const tableOccupancy = occupancy[table.number] ?? null
+    const occupancyState = tableOccupancy
+      ? STATE_OF_OCCUPANCY[tableOccupancy.status]
+      : canSeeAllOrders(viewerRole)
+        ? 'free'
+        : 'unknown'
     return {
       ...table,
-      state: mostUrgent
-        ? (STATE_OF_STATUS[mostUrgent.status] ?? 'free')
-        : canSeeAllOrders(viewerRole)
-          ? 'free'
-          : 'unknown',
+      state: mostUrgent ? (STATE_OF_STATUS[mostUrgent.status] ?? 'free') : occupancyState,
       orders: tableOrders,
-      since: mostUrgent?.updatedAt ?? null,
+      occupancy: tableOccupancy,
+      since:
+        mostUrgent?.updatedAt ??
+        (tableOccupancy?.status === 'LIBRE' ? null : (tableOccupancy?.statusChangedAt ?? null)),
       unread: tableOrders.reduce((sum, order) => sum + (unread[orderChatChannel(order.id)] ?? 0), 0),
     }
   })

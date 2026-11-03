@@ -90,15 +90,16 @@ export function CameraRig({ mode, focus = WHOLE_ROOM, resetSignal, enabled }: Ca
     controls.mouseButtons.wheel = ACTION.ZOOM
   }, [mode])
 
-  // Pose de référence : au montage (sans animation), au retour en vue iso, sur
-  // demande (« Recentrer », dans les deux modes), et quand la taille du canvas
-  // change en vue iso. Passer en caméra libre ne bouge pas la caméra.
+  // Pose de référence : au montage (sans animation, quel que soit le mode), au
+  // retour en vue iso, sur demande (« Recentrer », dans les deux modes), et quand
+  // la taille du canvas change en vue iso. Passer en caméra libre ne bouge pas la
+  // caméra.
   const lastResetRef = useRef(resetSignal)
   useEffect(() => {
     const controls = controlsRef.current
     const resetRequested = lastResetRef.current !== resetSignal
     lastResetRef.current = resetSignal
-    if (!controls || (mode !== 'iso' && !resetRequested)) return
+    if (!controls || (mode !== 'iso' && !resetRequested && placedRef.current)) return
     const animate = placedRef.current
     placedRef.current = true
     void controls.setLookAt(focus.x + ISO_DISTANCE, ISO_DISTANCE, focus.z + ISO_DISTANCE, focus.x, 0, focus.z, animate)

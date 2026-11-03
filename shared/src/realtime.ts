@@ -8,6 +8,12 @@ import type {
   PresenceUpdatedEvent,
 } from './chat.js';
 import {
+  TableErrorCode,
+  type TableState,
+  type TableStatusUpdatedEvent,
+  type UpdateTableStatusInput,
+} from './floor.js';
+import {
   orderItemSchema,
   orderStatusSchema,
   OrderStatusErrorCode,
@@ -28,6 +34,15 @@ export const OrderSocketEvent = {
   // resynchronisation complète") et rattrapage via le journal d'événements.
   SYNC: 'order:sync',
   EVENTS_SINCE: 'order:events:since',
+} as const;
+
+// Occupation des tables. Pas de journal : l'état est petit, et chaque table
+// porte une version. À la (re)connexion, le client recharge l'instantané
+// (`table:sync`) et garde, table par table, l'état de version la plus haute.
+export const TableSocketEvent = {
+  SYNC: 'table:sync',
+  STATUS_UPDATE: 'table:status:update',
+  STATUS_UPDATED: 'table:status-updated',
 } as const;
 
 // Chat et présence (cf. sujet, contrats `chat:message:create` / `chat:message:created`).
@@ -133,6 +148,7 @@ export function orderFromCreatedEvent(event: OrderCreatedEvent): Order {
 // Codes d'erreur des accusés de réception, en plus de ceux des transitions.
 export const RealtimeErrorCode = {
   ...OrderStatusErrorCode,
+  ...TableErrorCode,
   VALIDATION_ERROR: 'VALIDATION_ERROR',
   FORBIDDEN: 'FORBIDDEN',
   CHANNEL_FORBIDDEN: 'CHANNEL_FORBIDDEN',
@@ -161,6 +177,8 @@ export type OrderSyncAck = { accepted: true; orders: Order[]; lastEventId: numbe
 export type OrderEventsSinceAck =
   { accepted: true; events: OrderJournalEvent[]; complete: boolean } | AckFailure;
 export type ChatJoinAck = { accepted: true; messages: ChatMessageCreatedEvent[] } | AckFailure;
+export type TableAck = { accepted: true; tableNumber: number } | AckFailure;
+export type TableSyncAck = { accepted: true; tables: TableState[] } | AckFailure;
 
 // Typage Socket.IO partagé entre le serveur et le client.
 export interface ClientToServerEvents {
@@ -177,6 +195,14 @@ export interface ClientToServerEvents {
     input: UpdateOrderStatusInput,
     ack: (response: Ack) => void,
   ) => void;
+  [TableSocketEvent.SYNC]: (
+    input: Record<string, never>,
+    ack: (response: TableSyncAck) => void,
+  ) => void;
+  [TableSocketEvent.STATUS_UPDATE]: (
+    input: UpdateTableStatusInput,
+    ack: (response: TableAck) => void,
+  ) => void;
   [ChatSocketEvent.CHANNEL_JOIN]: (
     input: ChatChannelRequest,
     ack: (response: ChatJoinAck) => void,
@@ -191,6 +217,7 @@ export interface ClientToServerEvents {
 export interface ServerToClientEvents {
   [OrderSocketEvent.CREATED]: (event: OrderCreatedEvent) => void;
   [OrderSocketEvent.STATUS_UPDATED]: (event: OrderStatusUpdatedEvent) => void;
+  [TableSocketEvent.STATUS_UPDATED]: (event: TableStatusUpdatedEvent) => void;
   [ChatSocketEvent.MESSAGE_CREATED]: (event: ChatMessageCreatedEvent) => void;
   [ChatSocketEvent.PRESENCE_UPDATED]: (event: PresenceUpdatedEvent) => void;
 }

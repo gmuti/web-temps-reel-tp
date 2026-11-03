@@ -4,6 +4,7 @@ import * as api from './api'
 
 type AuthContextValue = {
   user: User | null
+  accessToken: string | null
   isLoading: boolean
   login: (email: string, password: string) => Promise<void>
   logout: () => void
@@ -28,12 +29,14 @@ function readStoredAuth(): StoredAuth | null {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [accessToken, setAccessToken] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     const stored = readStoredAuth()
     if (stored) {
       api.setAccessToken(stored.accessToken)
+      setAccessToken(stored.accessToken)
       setUser(stored.user)
     }
     setIsLoading(false)
@@ -42,17 +45,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     const response = await api.login({ email, password })
     api.setAccessToken(response.accessToken)
+    setAccessToken(response.accessToken)
     setUser(response.user)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(response))
   }
 
   const logout = () => {
     api.setAccessToken(null)
+    setAccessToken(null)
     setUser(null)
     localStorage.removeItem(STORAGE_KEY)
   }
 
-  const value = useMemo(() => ({ user, isLoading, login, logout }), [user, isLoading])
+  const value = useMemo(
+    () => ({ user, accessToken, isLoading, login, logout }),
+    [user, accessToken, isLoading],
+  )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

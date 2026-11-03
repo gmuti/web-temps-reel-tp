@@ -1,14 +1,24 @@
-import { orderTotal, type Order } from '@app/shared'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { ApiError, getOrders } from '@/lib/api'
+import { canSeeAllOrders, OrderStatusErrorCode, type Order, type User } from '@app/shared'
+import { useState } from 'react'
+import { toast } from 'sonner'
 import { useAuth } from '@/lib/auth-context'
+import { useChat } from '@/lib/use-chat'
+import { useOrdersRealtime } from '@/lib/use-orders-realtime'
+import { AckError, useRealtimeSocket, type ConnectionState } from '@/lib/use-realtime-socket'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
+import { ChatPanel } from '@/components/chat-panel'
 import { CreateOrderDialog } from '@/components/create-order-dialog'
+import { OrderCard } from '@/components/order-card'
 
-const POLL_INTERVAL_MS = 4000
+const CONNECTION_BADGES: Record<ConnectionState, { label: string; variant: 'secondary' | 'outline' | 'destructive' }> =
+  {
+    connecting: { label: 'Connexion…', variant: 'outline' },
+    connected: { label: 'Connecté', variant: 'secondary' },
+    reconnecting: { label: 'Reconnexion…', variant: 'destructive' },
+    offline: { label: 'Déconnecté', variant: 'destructive' },
+  }
 
 const STATUS_LABELS: Record<Order['status'], string> = {
   A_VALIDER: 'À valider',
@@ -19,66 +29,61 @@ const STATUS_LABELS: Record<Order['status'], string> = {
   ANNULEE: 'Annulée',
 }
 
-const STATUS_VARIANTS: Record<Order['status'], 'default' | 'secondary' | 'destructive' | 'outline'> = {
-  A_VALIDER: 'outline',
-  VALIDEE: 'secondary',
-  EN_PREPARATION: 'default',
-  PRETE: 'default',
-  SERVIE: 'secondary',
-  ANNULEE: 'destructive',
-}
+// Colonnes du kanban : les statuts en cours (servies et annulées quittent le tableau).
+const KANBAN_COLUMNS: readonly Order['status'][] = ['A_VALIDER', 'VALIDEE', 'EN_PREPARATION', 'PRETE']
 
-export function OrderBoard() {
-  const { user, logout } = useAuth()
-  const [orders, setOrders] = useState<Order[]>([])
-  const [error, setError] = useState<string | null>(null)
-  const [isConnected, setIsConnected] = useState(true)
-  const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null)
+export function OrderBoard({ user }: { user: User }) {
+  const { accessToken, logout } = useAuth()
+  const { socket, connection } = useRealtimeSocket(accessToken, logout)
+  const { orders, resync, createOrder, updateStatus } = useOrdersRealtime(socket)
+  const chat = useChat(socket, user.role)
+  const [pendingOrderId, setPendingOrderId] = useState<string | null>(null)
+  const badge = CONNECTION_BADGES[connection]
 
-  const refresh = useCallback(async () => {
+  // Le client demande une transition et attend l'accusé de réception ; la carte
+  // ne change qu'à réception de l'événement `order:status-updated` publié par le
+  // serveur (le serveur reste l'autorité sur l'état).
+  const handleStatusChange = async (order: Order, requestedStatus: Order['status']) => {
+    setPendingOrderId(order.id)
     try {
-      const data = await getOrders()
-      setOrders(data)
-      setIsConnected(true)
-      setError(null)
+      await updateStatus(order, requestedStatus)
+      toast.success(`Table ${order.tableNumber} : ${STATUS_LABELS[requestedStatus]}`)
     } catch (err) {
-      setIsConnected(false)
-      setError(err instanceof ApiError ? err.message : 'Connexion au serveur perdue.')
+      if (err instanceof AckError && err.errorCode === OrderStatusErrorCode.STATUS_CONFLICT) {
+        toast.warning(`Table ${order.tableNumber} : ${err.message} Tableau actualisé.`)
+        await resync()
+      } else {
+        toast.error(err instanceof Error ? err.message : 'Impossible de modifier la commande.')
+      }
+    } finally {
+      setPendingOrderId(null)
     }
-  }, [])
+  }
 
-  useEffect(() => {
-    refresh()
-    pollTimer.current = setInterval(refresh, POLL_INTERVAL_MS)
-    return () => {
-      if (pollTimer.current) clearInterval(pollTimer.current)
+  const handleOpenDiscussion = async (order: Order) => {
+    try {
+      await chat.openOrderChannel(order)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Impossible d’ouvrir la discussion.')
     }
-  }, [refresh])
-
-  const handleCreated = (order: Order) => {
-    setOrders((current) => [...current, order])
   }
 
   return (
-    <div className="mx-auto flex min-h-svh max-w-5xl flex-col gap-6 p-6">
+    <div className="mx-auto flex min-h-svh max-w-screen-2xl flex-col gap-6 p-6">
       <header className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Tableau de commandes</h1>
-          <p className="text-muted-foreground text-sm">
-            Rafraîchissement automatique toutes les {POLL_INTERVAL_MS / 1000}s
-          </p>
+          <h1 className="text-2xl font-semibold">
+            {canSeeAllOrders(user.role) ? 'Tableau de commandes' : 'Mes commandes'}
+          </h1>
+          <p className="text-muted-foreground text-sm">Mises à jour en temps réel (Socket.IO)</p>
         </div>
-        <div className="flex items-center gap-3">
-          <Badge variant={isConnected ? 'secondary' : 'destructive'}>
-            {isConnected ? 'Connecté' : 'Déconnecté'}
-          </Badge>
-          <CreateOrderDialog onCreated={handleCreated} />
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <Badge variant={badge.variant}>{badge.label}</Badge>
+          <CreateOrderDialog onSubmit={createOrder} />
           <div className="flex items-center gap-2">
-            {user && (
-              <span className="text-muted-foreground text-sm">
-                {user.name} · {user.role}
-              </span>
-            )}
+            <span className="text-muted-foreground text-sm">
+              {user.name} · {user.role}
+            </span>
             <Button variant="outline" size="sm" onClick={logout}>
               Se déconnecter
             </Button>
@@ -88,40 +93,50 @@ export function OrderBoard() {
 
       <Separator />
 
-      {error && <p className="text-destructive text-sm">{error}</p>}
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_22rem]">
+        <main className="grid auto-cols-[minmax(15rem,1fr)] grid-flow-col gap-4 overflow-x-auto pb-2">
+          {KANBAN_COLUMNS.map((status) => {
+            const columnOrders = orders.filter((order) => order.status === status)
+            return (
+              <section key={status} aria-label={STATUS_LABELS[status]} className="bg-muted/50 rounded-lg p-3">
+                <header className="mb-3 flex items-center justify-between">
+                  <h2 className="text-sm font-semibold">{STATUS_LABELS[status]}</h2>
+                  <Badge variant="secondary">{columnOrders.length}</Badge>
+                </header>
+                <div className="flex flex-col gap-3">
+                  {columnOrders.length === 0 ? (
+                    <p className="text-muted-foreground py-6 text-center text-xs">Aucune commande</p>
+                  ) : (
+                    columnOrders.map((order) => (
+                      <OrderCard
+                        key={order.id}
+                        order={order}
+                        role={user.role}
+                        isPending={pendingOrderId === order.id}
+                        onStatusChange={handleStatusChange}
+                        onOpenDiscussion={handleOpenDiscussion}
+                      />
+                    ))
+                  )}
+                </div>
+              </section>
+            )
+          })}
+        </main>
 
-      {orders.length === 0 ? (
-        <p className="text-muted-foreground text-sm">Aucune commande en cours.</p>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {orders.map((order) => (
-            <Card key={order.id}>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Table {order.tableNumber}</CardTitle>
-                  <Badge variant={STATUS_VARIANTS[order.status]}>{STATUS_LABELS[order.status]}</Badge>
-                </div>
-                {order.comment && <CardDescription>{order.comment}</CardDescription>}
-              </CardHeader>
-              <CardContent className="flex flex-col gap-1 text-sm">
-                {order.items.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between">
-                    <span>
-                      {item.quantity}× {item.meal}
-                    </span>
-                    <span className="text-muted-foreground">{(item.price * item.quantity).toFixed(2)} €</span>
-                  </div>
-                ))}
-                <Separator className="my-2" />
-                <div className="flex items-center justify-between font-medium">
-                  <span>Total</span>
-                  <span>{orderTotal(order).toFixed(2)} €</span>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+        <ChatPanel
+          currentUserId={user.id}
+          isConnected={connection === 'connected'}
+          channels={chat.channels}
+          activeChannelId={chat.activeChannelId}
+          messages={chat.messages}
+          unread={chat.unread}
+          online={chat.online}
+          onSelectChannel={chat.selectChannel}
+          onCloseChannel={chat.closeChannel}
+          onSend={chat.sendMessage}
+        />
+      </div>
     </div>
   )
 }

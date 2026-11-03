@@ -1,7 +1,8 @@
-import type { Order } from '@app/shared'
-import { PlusIcon, Trash2Icon } from 'lucide-react'
+import { ORDER_ITEM_NOTE_MAX_LENGTH, type CreateOrderRequest, type Dish } from '@app/shared'
+import { MinusIcon, PlusIcon } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
-import { ApiError, createOrder } from '@/lib/api'
+import { getDishes } from '@/lib/api'
+import { cn } from '@/lib/utils'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import {
@@ -16,93 +17,103 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
-type DraftItem = { meal: string; quantity: string; price: string }
-
-const EMPTY_ITEM: DraftItem = { meal: '', quantity: '1', price: '' }
+// Quantité et contrainte saisies pour chaque plat de la carte.
+type Selection = Record<string, { quantity: number; note: string }>
 
 type CreateOrderDialogProps = {
-  onCreated: (order: Order) => void
+  // Envoie la commande ; la nouvelle carte apparaît via l'événement `order:created`.
+  onSubmit: (input: CreateOrderRequest) => Promise<unknown>
 }
 
-export function CreateOrderDialog({ onCreated }: CreateOrderDialogProps) {
+export function CreateOrderDialog({ onSubmit }: CreateOrderDialogProps) {
   const [open, setOpen] = useState(false)
+  const [dishes, setDishes] = useState<Dish[] | null>(null)
   const [tableNumber, setTableNumber] = useState('')
   const [comment, setComment] = useState('')
-  const [items, setItems] = useState<DraftItem[]>([{ ...EMPTY_ITEM }])
+  const [selection, setSelection] = useState<Selection>({})
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const resetForm = () => {
     setTableNumber('')
     setComment('')
-    setItems([{ ...EMPTY_ITEM }])
+    setSelection({})
     setError(null)
   }
 
-  const updateItem = (index: number, patch: Partial<DraftItem>) => {
-    setItems((current) => current.map((item, i) => (i === index ? { ...item, ...patch } : item)))
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next)
+    if (!next) resetForm()
+    // La carte est chargée à la première ouverture.
+    if (next && !dishes) {
+      getDishes()
+        .then(setDishes)
+        .catch(() => setError('Impossible de charger la carte.'))
+    }
   }
 
-  const addItem = () => setItems((current) => [...current, { ...EMPTY_ITEM }])
+  const quantityOf = (dishId: string) => selection[dishId]?.quantity ?? 0
 
-  const removeItem = (index: number) =>
-    setItems((current) => (current.length > 1 ? current.filter((_, i) => i !== index) : current))
+  const setQuantity = (dishId: string, quantity: number) =>
+    setSelection((current) => ({
+      ...current,
+      [dishId]: { note: current[dishId]?.note ?? '', quantity: Math.max(0, Math.min(50, quantity)) },
+    }))
+
+  const setNote = (dishId: string, note: string) =>
+    setSelection((current) => ({ ...current, [dishId]: { quantity: current[dishId]?.quantity ?? 0, note } }))
+
+  const items = Object.entries(selection)
+    .filter(([, line]) => line.quantity > 0)
+    .map(([dishId, line]) => ({ dishId, quantity: line.quantity, note: line.note.trim() || undefined }))
+
+  const total = items.reduce(
+    (sum, item) => sum + item.quantity * (dishes?.find((dish) => dish.id === item.dishId)?.price ?? 0),
+    0,
+  )
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
     setError(null)
 
-    const parsedItems = items.map((item) => ({
-      meal: item.meal.trim(),
-      quantity: Number(item.quantity),
-      price: Number(item.price),
-    }))
-
-    if (parsedItems.some((item) => !item.meal || !Number.isFinite(item.quantity) || !Number.isFinite(item.price))) {
-      setError('Chaque article doit avoir un nom, une quantité et un prix valides.')
+    if (items.length === 0) {
+      setError('Choisissez au moins un plat.')
       return
     }
 
     setIsSubmitting(true)
     try {
-      const order = await createOrder({
+      await onSubmit({
         tableNumber: Number(tableNumber),
-        items: parsedItems,
+        items,
         comment: comment.trim() || undefined,
         clientOrderId: crypto.randomUUID(),
       })
-      onCreated(order)
       setOpen(false)
       resetForm()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Impossible de créer la commande.')
+      setError(err instanceof Error ? err.message : 'Impossible de créer la commande.')
     } finally {
       setIsSubmitting(false)
     }
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next)
-        if (!next) resetForm()
-      }}
-    >
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button>
           <PlusIcon />
           Nouvelle commande
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Nouvelle commande</DialogTitle>
-          <DialogDescription>Table, articles et commentaire éventuel.</DialogDescription>
+          <DialogDescription>Table, plats de la carte et contraintes éventuelles.</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 sm:w-40">
             <Label htmlFor="tableNumber">Numéro de table</Label>
             <Input
               id="tableNumber"
@@ -115,58 +126,73 @@ export function CreateOrderDialog({ onCreated }: CreateOrderDialogProps) {
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label>Articles</Label>
-            {items.map((item, index) => (
-              <div key={index} className="flex items-center gap-2">
-                <Input
-                  placeholder="Plat"
-                  value={item.meal}
-                  onChange={(event) => updateItem(index, { meal: event.target.value })}
-                  className="flex-1"
-                  required
-                />
-                <Input
-                  type="number"
-                  min={1}
-                  placeholder="Qté"
-                  value={item.quantity}
-                  onChange={(event) => updateItem(index, { quantity: event.target.value })}
-                  className="w-16"
-                  required
-                />
-                <Input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  placeholder="Prix"
-                  value={item.price}
-                  onChange={(event) => updateItem(index, { price: event.target.value })}
-                  className="w-20"
-                  required
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => removeItem(index)}
-                  disabled={items.length === 1}
-                >
-                  <Trash2Icon />
-                  <span className="sr-only">Retirer l'article</span>
-                </Button>
+            <Label>Carte</Label>
+            {!dishes ? (
+              <p className="text-muted-foreground text-sm">Chargement de la carte…</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
+                {dishes.map((dish) => {
+                  const quantity = quantityOf(dish.id)
+                  return (
+                    <div
+                      key={dish.id}
+                      className={cn(
+                        'flex flex-col overflow-hidden rounded-lg border',
+                        quantity > 0 && 'border-primary ring-primary/30 ring-2',
+                      )}
+                    >
+                      <img src={dish.imageUrl} alt={dish.name} className="h-24 w-full object-cover" />
+                      <div className="flex flex-1 flex-col gap-2 p-2">
+                        <div className="flex items-start justify-between gap-2 text-sm">
+                          <span className="font-medium">{dish.name}</span>
+                          <span className="text-muted-foreground shrink-0">{dish.price.toFixed(2)} €</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            size="icon-sm"
+                            variant="outline"
+                            onClick={() => setQuantity(dish.id, quantity - 1)}
+                            disabled={quantity === 0}
+                            aria-label={`Retirer : ${dish.name}`}
+                          >
+                            <MinusIcon />
+                          </Button>
+                          <span className="w-6 text-center text-sm tabular-nums" aria-label={`Quantité : ${dish.name}`}>
+                            {quantity}
+                          </span>
+                          <Button
+                            type="button"
+                            size="icon-sm"
+                            variant="outline"
+                            onClick={() => setQuantity(dish.id, quantity + 1)}
+                            aria-label={`Ajouter : ${dish.name}`}
+                          >
+                            <PlusIcon />
+                          </Button>
+                        </div>
+                        {quantity > 0 && (
+                          <Input
+                            placeholder="Contrainte (sans oignon…)"
+                            value={selection[dish.id]?.note ?? ''}
+                            onChange={(event) => setNote(dish.id, event.target.value)}
+                            maxLength={ORDER_ITEM_NOTE_MAX_LENGTH}
+                            aria-label={`Contrainte pour ${dish.name}`}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-            ))}
-            <Button type="button" variant="outline" size="sm" onClick={addItem} className="self-start">
-              <PlusIcon />
-              Ajouter un article
-            </Button>
+            )}
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="comment">Commentaire</Label>
+            <Label htmlFor="comment">Commentaire sur la commande</Label>
             <Input
               id="comment"
-              placeholder="Sans oignons…"
+              placeholder="Allergie, client pressé…"
               value={comment}
               onChange={(event) => setComment(event.target.value)}
             />
@@ -178,7 +204,8 @@ export function CreateOrderDialog({ onCreated }: CreateOrderDialogProps) {
             </Alert>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="items-center sm:justify-between">
+            <span className="text-sm font-medium">Total : {total.toFixed(2)} €</span>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? 'Envoi…' : 'Créer la commande'}
             </Button>

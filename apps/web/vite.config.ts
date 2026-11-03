@@ -14,5 +14,8 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
+    // Dans Docker sous Windows, le dossier monté ne remonte pas les événements de
+    // fichiers : sans scrutation, Vite ne voit pas les modifications (cf. docker-compose.yml).
+    watch: { usePolling: process.env.VITE_USE_POLLING === 'true' },
   },
 })

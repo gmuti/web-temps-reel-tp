@@ -1,32 +1,39 @@
-# React + TypeScript + Vite
+# Front — React + Vite + shadcn/ui
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Interface du tableau de commandes et du chat. Vue d'ensemble, contrats et
+démarrage : voir le [README principal](../../README.md).
 
-Currently, two official plugins are available:
+## Organisation
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```text
+src/
+  lib/
+    api.ts                 client HTTP (connexion, carte)
+    auth-context.tsx       session (jeton conservé dans localStorage)
+    use-realtime-socket.ts connexion Socket.IO partagée, accusés de réception
+    use-orders-realtime.ts tableau en direct, rattrapage après coupure
+    use-chat.ts            canaux, messages, non-lus, présence
+  components/
+    order-board.tsx        page principale : kanban + chat
+    order-card.tsx         carte d'une commande (carrousel, contraintes, actions)
+    dish-carousel.tsx      carrousel des photos des plats
+    create-order-dialog.tsx formulaire de commande à partir de la carte
+    chat-panel.tsx         panneau de chat
+    login-form.tsx
+    ui/                    composants shadcn/ui
+public/dishes/             illustrations des plats (remplaçables par des photos)
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Toutes les données reçues (HTTP, accusés, événements) sont validées avec les
+schémas Zod de `@app/shared`.
+
+## Commandes
+
+```bash
+npm run dev      # http://localhost:5173
+npm run build
+npm run lint
+```
+
+Variable d'environnement : `VITE_API_URL` (voir `.env.example`). Dans Docker,
+`VITE_USE_POLLING=true` active la scrutation des fichiers par Vite.

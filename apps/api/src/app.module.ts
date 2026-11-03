@@ -6,9 +6,12 @@ import 'dotenv/config';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module.js';
+import { ChatModule } from './chat/chat.module.js';
+import { DishesModule } from './dishes/dishes.module.js';
 import { HealthModule } from './health/health.module.js';
 import { OrdersModule } from './orders/orders.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { RealtimeModule } from './realtime/realtime.module.js';
 import { UsersModule } from './users/users.module.js';
 
 @Module({
@@ -20,7 +23,10 @@ import { UsersModule } from './users/users.module.js';
     HealthModule,
     UsersModule,
     AuthModule,
+    DishesModule,
     OrdersModule,
+    RealtimeModule,
+    ChatModule,
   ],
 })
 export class AppModule {}

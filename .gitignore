@@ -5,6 +5,7 @@ node_modules/
 dist/
 build/
 apps/api/src/generated/
+*.tsbuildinfo
 
 # Env files
 .env

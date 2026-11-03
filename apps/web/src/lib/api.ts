@@ -1,15 +1,6 @@
-import {
-  authResponseSchema,
-  orderSchema,
-  ordersListSchema,
-  type AuthResponse,
-  type CreateOrderRequest,
-  type ListOrdersRequest,
-  type LoginInput,
-  type Order,
-} from '@app/shared'
+import { authResponseSchema, dishesListSchema, type AuthResponse, type Dish, type LoginInput } from '@app/shared'
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
+export const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
 
 export class ApiError extends Error {
   status: number
@@ -59,18 +50,7 @@ export async function login(input: LoginInput): Promise<AuthResponse> {
   return authResponseSchema.parse(data)
 }
 
-export async function getOrders(query: ListOrdersRequest = {}): Promise<Order[]> {
-  const search = new URLSearchParams()
-  if (query.status) search.set('status', query.status)
-  const qs = search.toString()
-  const data = await request<unknown[]>(`/orders${qs ? `?${qs}` : ''}`)
-  return ordersListSchema.parse(data)
-}
-
-export async function createOrder(input: CreateOrderRequest): Promise<Order> {
-  const data = await request<unknown>('/orders', {
-    method: 'POST',
-    body: JSON.stringify(input),
-  })
-  return orderSchema.parse(data)
+export async function getDishes(): Promise<Dish[]> {
+  const data = await request<unknown>('/dishes')
+  return dishesListSchema.parse(data)
 }

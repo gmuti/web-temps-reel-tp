@@ -31,8 +31,11 @@ model Restaurant {
   slug      String   @unique
   createdAt DateTime @default(now())
 
-  users  User[]
-  orders Order[]
+  users       User[]
+  orders      Order[]
+  messages    Message[]
+  dishes      Dish[]
+  orderEvents OrderEvent[]
 }
 
 model User {
@@ -47,6 +50,7 @@ model User {
 
   restaurant Restaurant? @relation(fields: [restaurantId], references: [id])
   orders     Order[]     @relation("OrderWaiter")
+  messages   Message[]
 
   @@index([restaurantId])
 }
@@ -58,15 +62,16 @@ model Order {
   status        OrderStatus @default(A_VALIDER)
   comment       String?
   // Idempotence : rejouer une création avec le même clientOrderId ne doit
-  // jamais produire une seconde commande (cf. README, séance 1).
+  // jamais produire une seconde commande (cf. sujet, séance 1).
   clientOrderId String?     @unique
   waiterId      String
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
-  restaurant Restaurant  @relation(fields: [restaurantId], references: [id])
-  waiter     User        @relation("OrderWaiter", fields: [waiterId], references: [id])
+  restaurant Restaurant   @relation(fields: [restaurantId], references: [id])
+  waiter     User         @relation("OrderWaiter", fields: [waiterId], references: [id])
   items      OrderItem[]
+  events     OrderEvent[]
 
   @@index([restaurantId, status])
 }
@@ -74,13 +79,73 @@ model Order {
 model OrderItem {
   id       String  @id @default(uuid())
   orderId  String
+  // Plat de la carte. Nom et prix sont recopiés (`meal`, `price`) : la commande
+  // reste lisible même si la carte change. Null pour les commandes antérieures
+  // au catalogue.
+  dishId   String?
   meal     String
   quantity Int
   // Prix unitaire au moment de la commande (indépendant d'un futur prix de
   // carte) — Decimal pour éviter les erreurs d'arrondi des flottants.
   price    Decimal @db.Decimal(10, 2)
+  // Contrainte libre sur ce plat ("sans oignon"...).
+  note     String?
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  dish  Dish? @relation(fields: [dishId], references: [id])
 
   @@index([orderId])
+}
+
+// Carte du restaurant.
+model Dish {
+  id           String   @id @default(uuid())
+  restaurantId String
+  name         String
+  price        Decimal  @db.Decimal(10, 2)
+  // Chemin d'une image servie par le front (ex. "/dishes/burger.svg").
+  imageUrl     String
+  createdAt    DateTime @default(now())
+
+  restaurant Restaurant  @relation(fields: [restaurantId], references: [id])
+  orderItems OrderItem[]
+
+  @@unique([restaurantId, name])
+}
+
+// Journal des événements publiés sur les commandes : l'identifiant croissant sert
+// de curseur pour rattraper les événements manqués après une coupure.
+model OrderEvent {
+  id           Int      @id @default(autoincrement())
+  restaurantId String
+  orderId      String
+  // Serveur de la commande : permet de ne rejouer à un serveur que ses commandes.
+  waiterId     String
+  // "order:created" ou "order:status-updated" (cf. shared/src/realtime.ts).
+  type         String
+  // Données de l'événement publié, sans son identifiant.
+  payload      Json
+  createdAt    DateTime @default(now())
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id])
+  order      Order      @relation(fields: [orderId], references: [id])
+
+  @@index([restaurantId, id])
+}
+
+model Message {
+  id              String   @id @default(uuid())
+  restaurantId    String
+  // "general", "kitchen", "service" ou "order:<orderId>" (cf. shared/src/chat.ts).
+  channelId       String
+  authorId        String
+  content         String
+  // Idempotence : un message renvoyé après une reconnexion n'est pas dupliqué.
+  clientMessageId String   @unique
+  createdAt       DateTime @default(now())
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id])
+  author     User       @relation(fields: [authorId], references: [id])
+
+  @@index([restaurantId, channelId, createdAt])
 }

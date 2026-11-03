@@ -50,6 +50,7 @@ services:
       - api
     environment:
       VITE_API_URL: http://localhost:${API_PORT:-3001}
+      VITE_USE_POLLING: 'true'
     ports:
       - '${WEB_PORT:-5173}:5173'
     volumes:

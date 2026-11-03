@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * Rôles applicatifs (cf. README, "Rôles proposés").
+ * Rôles applicatifs (cf. sujet, "Rôles proposés").
  * RESPONSABLE : supervise le service, accède à tous les canaux.
  * MANAGER     : gère les utilisateurs et les restaurants.
  * WAITER      : enregistre les commandes depuis la salle (Serveur).

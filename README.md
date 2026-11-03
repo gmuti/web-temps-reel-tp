@@ -43,6 +43,11 @@ dans [`docs/sujet.md`](docs/sujet.md).
   assiettes prêtes sur le passe, tickets et fourneaux en cuisine. Un clic sur
   une table ouvre ses commandes, avec les mêmes actions que le kanban, et
   permet d'en créer une pour cette table. Caméra isométrique fixe ou libre.
+  Les événements en direct sont animés (ticket qui part en cuisine, assiette du
+  fourneau au passe puis du passe à la table, anneau sous une nouvelle
+  commande), les tables en retard sont signalées, et les personnes connectées
+  apparaissent dans leur zone (cuisine, salle, entrée). La cuisine voit d'abord
+  sa zone.
   Le mobilier vient du [Furniture Kit de Kenney](https://kenney.nl/assets/furniture-kit)
   (CC0, licence dans `apps/web/public/models/kenney-furniture/`).
 - Sur chaque commande : carrousel des photos des plats, contraintes en badge.
@@ -138,6 +143,12 @@ remplacée par le kanban si WebGL est indisponible ou perdu. Les modèles
 `.glb` (11 fichiers, ~180 Ko, ~47 Ko en gzip) sont servis depuis `public/` et
 préchargés à l'ouverture du plan ; tant qu'ils chargent, ou s'ils échouent, le
 mobilier est dessiné en formes simples (`scene/kit-model.tsx`).
+
+Les animations partent des événements reçus en direct (`onLiveEvent` de
+`useOrdersRealtime`), jamais de ceux rejoués lors d'un rattrapage : après une
+coupure, la scène se remet à jour sans rejouer d'animations. `order-effects.ts`
+traduit un événement en effet (fonction pure, testée), avec un garde-fou contre
+les rafales ; rien n'est animé onglet masqué ou avec « réduire les animations ».
 
 ## Règles métier
 

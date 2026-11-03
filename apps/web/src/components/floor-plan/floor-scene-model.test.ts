@@ -1,7 +1,7 @@
 import { orderChatChannel, type Order } from '@app/shared'
 import { describe, expect, it } from 'vitest'
 import type { FloorTable } from './floor-plan-data'
-import { buildScene } from './floor-scene-model'
+import { buildScene, isLate, placeStaff } from './floor-scene-model'
 
 const TABLES: FloorTable[] = [
   { number: 1, x: 0, z: 0, shape: 'small', seats: 2 },
@@ -87,5 +87,41 @@ describe('buildScene', () => {
       'RESPONSABLE',
     )
     expect(scene.tables[0].unread).toBe(3)
+  })
+})
+
+describe('isLate', () => {
+  const now = new Date(Date.UTC(2026, 10, 3, 12, 0))
+  const minutesAgo = (minutes: number) => new Date(now.getTime() - minutes * 60_000)
+
+  it('signale une assiette prête qui attend depuis 3 minutes', () => {
+    expect(isLate('ready', minutesAgo(2), now)).toBe(false)
+    expect(isLate('ready', minutesAgo(3), now)).toBe(true)
+  })
+
+  it('laisse plus de temps à une préparation', () => {
+    expect(isLate('cooking', minutesAgo(15), now)).toBe(false)
+    expect(isLate('cooking', minutesAgo(20), now)).toBe(true)
+  })
+
+  it("ne signale jamais une table libre ou sans date d'entrée", () => {
+    expect(isLate('free', minutesAgo(600), now)).toBe(false)
+    expect(isLate('to-validate', null, now)).toBe(false)
+  })
+})
+
+describe('placeStaff', () => {
+  const person = (id: string, role: 'COOK' | 'WAITER' | 'RESPONSABLE' | 'MANAGER') => ({
+    id: `00000000-0000-4000-8000-00000000000${id}`,
+    name: `Personne ${id}`,
+    role,
+  })
+
+  it('place chaque rôle dans sa zone, côte à côte', () => {
+    const staff = placeStaff([person('1', 'COOK'), person('2', 'WAITER'), person('3', 'COOK'), person('4', 'MANAGER')])
+    expect(staff.map((member) => member.zone)).toEqual(['kitchen', 'floor', 'kitchen', 'office'])
+    const [firstCook, , secondCook] = staff
+    expect(secondCook.z).toBe(firstCook.z)
+    expect(secondCook.x).not.toBe(firstCook.x)
   })
 })

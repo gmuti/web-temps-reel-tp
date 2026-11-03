@@ -1,5 +1,5 @@
-import { canSeeAllOrders, orderChatChannel, type Order, type UserRole } from '@app/shared'
-import type { FloorTable } from './floor-plan-data'
+import { canSeeAllOrders, orderChatChannel, type ChatAuthor, type Order, type UserRole } from '@app/shared'
+import { KITCHEN_COUNTER_Z, PASS_COUNTER, ROOM, type FloorTable } from './floor-plan-data'
 
 /**
  * État visuel d'une table, déduit de ses commandes en cours.
@@ -45,6 +45,20 @@ const STATE_OF_STATUS: Partial<Record<Order['status'], TableVisualState>> = {
 
 const byUpdatedAt = (a: Order, b: Order) => a.updatedAt.getTime() - b.updatedAt.getTime()
 
+// Attente au-delà de laquelle une table est signalée en retard, selon son état.
+// Une assiette prête refroidit vite ; une préparation prend naturellement du temps.
+export const LATE_AFTER_MINUTES: Partial<Record<TableVisualState, number>> = {
+  ready: 3,
+  'to-validate': 5,
+  validated: 10,
+  cooking: 20,
+}
+
+export function isLate(state: TableVisualState, since: Date | null, now: Date): boolean {
+  const limit = LATE_AFTER_MINUTES[state]
+  return limit !== undefined && since !== null && now.getTime() - since.getTime() >= limit * 60_000
+}
+
 /**
  * Modèle de la scène, indépendant du rendu : la scène 3D ne fait que l'afficher.
  * `orders` vient de useOrdersRealtime (déjà filtré selon le rôle, sans les
@@ -84,4 +98,38 @@ export function buildScene(
       .sort(byUpdatedAt),
     passPlates: active.filter((order) => order.status === 'PRETE').sort(byUpdatedAt),
   }
+}
+
+export type StaffZone = 'kitchen' | 'floor' | 'office'
+
+export type StaffView = { user: ChatAuthor; zone: StaffZone; x: number; z: number }
+
+// Où se tient chaque rôle : cuisiniers entre le plan de travail et le passe,
+// serveurs côté salle devant le passe, responsables et managers à l'entrée.
+const ZONE_OF_ROLE: Record<UserRole, StaffZone> = {
+  COOK: 'kitchen',
+  WAITER: 'floor',
+  RESPONSABLE: 'office',
+  MANAGER: 'office',
+}
+
+const ZONE_ORIGIN: Record<StaffZone, { x: number; z: number; step: number }> = {
+  kitchen: { x: -2.4, z: (KITCHEN_COUNTER_Z + PASS_COUNTER.z) / 2, step: 1.2 },
+  floor: { x: PASS_COUNTER.x + PASS_COUNTER.width / 2 + 0.8, z: PASS_COUNTER.z + 1, step: 0.8 },
+  office: { x: ROOM.width / 2 - 1, z: ROOM.depth / 2 - 2.2, step: -0.8 },
+}
+
+/**
+ * Personnes connectées (présence) placées dans la zone de leur rôle, côte à
+ * côte dans l'ordre de la liste. Position symbolique : l'application ne connaît
+ * pas la position réelle du personnel.
+ */
+export function placeStaff(online: readonly ChatAuthor[]): StaffView[] {
+  const placed: Record<StaffZone, number> = { kitchen: 0, floor: 0, office: 0 }
+  return online.map((user) => {
+    const zone = ZONE_OF_ROLE[user.role]
+    const origin = ZONE_ORIGIN[zone]
+    const index = placed[zone]++
+    return { user, zone, x: origin.x + index * origin.step, z: origin.z }
+  })
 }

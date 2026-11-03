@@ -24,6 +24,12 @@ function applyEvent(orders: Order[], entry: OrderJournalEvent): Order[] {
     : orders.map((o) => (o.id === orderId ? { ...o, status, updatedAt } : o))
 }
 
+type OrdersRealtimeOptions = {
+  // Appelé pour chaque événement reçu en direct, après son application. Pas
+  // pour ceux rejoués lors d'un rattrapage : les animer n'aurait pas de sens.
+  onLiveEvent?: (entry: OrderJournalEvent) => void
+}
+
 /**
  * Tableau de commandes temps réel via Socket.IO (cf. sujet, séance 3).
  * Première connexion : instantané (`order:sync`) et position dans le journal.
@@ -32,17 +38,23 @@ function applyEvent(orders: Order[], entry: OrderJournalEvent): Order[] {
  * Les événements reçus pendant ce rattrapage sont mis en attente puis appliqués
  * dans l'ordre du journal ; ceux déjà appliqués sont ignorés.
  */
-export function useOrdersRealtime(socket: RealtimeSocket | null) {
+export function useOrdersRealtime(socket: RealtimeSocket | null, options: OrdersRealtimeOptions = {}) {
   const [orders, setOrders] = useState<Order[]>([])
   const lastEventIdRef = useRef<number | null>(null)
   const catchingUpRef = useRef(false)
   const pendingRef = useRef<OrderJournalEvent[]>([])
+  const onLiveEventRef = useRef(options.onLiveEvent)
 
-  const apply = useCallback((entry: OrderJournalEvent) => {
+  useEffect(() => {
+    onLiveEventRef.current = options.onLiveEvent
+  }, [options.onLiveEvent])
+
+  const apply = useCallback((entry: OrderJournalEvent, live = false) => {
     const last = lastEventIdRef.current
     if (last !== null && entry.event.eventId <= last) return
     lastEventIdRef.current = entry.event.eventId
     setOrders((current) => applyEvent(current, entry))
+    if (live) onLiveEventRef.current?.(entry)
   }, [])
 
   const resync = useCallback(async () => {
@@ -56,7 +68,10 @@ export function useOrdersRealtime(socket: RealtimeSocket | null) {
     if (after !== null) {
       const ack = await emitWithAck(socket, OrderSocketEvent.EVENTS_SINCE, { after })
       if (ack.complete) {
-        orderJournalEventSchema.array().parse(ack.events).forEach(apply)
+        orderJournalEventSchema
+          .array()
+          .parse(ack.events)
+          .forEach((entry) => apply(entry))
         return
       }
     }
@@ -76,13 +91,13 @@ export function useOrdersRealtime(socket: RealtimeSocket | null) {
         catchingUpRef.current = false
         const pending = pendingRef.current.sort((a, b) => a.event.eventId - b.event.eventId)
         pendingRef.current = []
-        pending.forEach(apply)
+        pending.forEach((entry) => apply(entry))
       }
     }
     const onEvent = (type: OrderJournalEvent['type']) => (payload: unknown) => {
       const entry = orderJournalEventSchema.parse({ type, event: payload })
       if (catchingUpRef.current) pendingRef.current.push(entry)
-      else apply(entry)
+      else apply(entry, true)
     }
     const onCreated = onEvent(OrderSocketEvent.CREATED)
     const onStatusUpdated = onEvent(OrderSocketEvent.STATUS_UPDATED)

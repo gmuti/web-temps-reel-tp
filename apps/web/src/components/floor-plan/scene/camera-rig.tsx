@@ -29,8 +29,15 @@ const TARGET_BOUNDARY = new Box3(
   new Vector3(ROOM.width / 2, ROOM.depth, ROOM.depth / 2),
 )
 
+// Partie de la salle cadrée par la vue de référence : point visé au sol (x, z)
+// et zoom relatif au cadrage de toute la salle.
+export type CameraFocus = { x: number; z: number; zoom: number }
+
+const WHOLE_ROOM: CameraFocus = { x: 0, z: 0, zoom: 1 }
+
 type CameraRigProps = {
   mode: CameraMode
+  focus?: CameraFocus
   // Incrémenté pour revenir à la vue iso de référence.
   resetSignal: number
   // Faux quand un dialog recouvre la scène : les gestes ne doivent pas la bouger.
@@ -41,7 +48,7 @@ type CameraRigProps = {
  * Caméra orthographique : vue iso fixe (déplacement et zoom seulement) ou
  * caméra libre (rotation en plus). Le passage en vue iso est animé.
  */
-export function CameraRig({ mode, resetSignal, enabled }: CameraRigProps) {
+export function CameraRig({ mode, focus = WHOLE_ROOM, resetSignal, enabled }: CameraRigProps) {
   const controlsRef = useRef<CameraControlsImpl>(null)
   const size = useThree((state) => state.size)
   const wholeRoomZoom = Math.min(size.width / ISO_SCREEN_WIDTH, size.height / ISO_SCREEN_HEIGHT)
@@ -94,9 +101,9 @@ export function CameraRig({ mode, resetSignal, enabled }: CameraRigProps) {
     if (!controls || (mode !== 'iso' && !resetRequested)) return
     const animate = placedRef.current
     placedRef.current = true
-    void controls.setLookAt(ISO_DISTANCE, ISO_DISTANCE, ISO_DISTANCE, 0, 0, 0, animate)
-    void controls.zoomTo(fitZoom, animate)
-  }, [mode, resetSignal, fitZoom])
+    void controls.setLookAt(focus.x + ISO_DISTANCE, ISO_DISTANCE, focus.z + ISO_DISTANCE, focus.x, 0, focus.z, animate)
+    void controls.zoomTo(fitZoom * focus.zoom, animate)
+  }, [mode, resetSignal, fitZoom, focus.x, focus.z, focus.zoom])
 
   return <CameraControls ref={controlsRef} makeDefault enabled={enabled} />
 }

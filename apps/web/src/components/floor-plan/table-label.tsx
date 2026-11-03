@@ -1,6 +1,6 @@
 import { ClockIcon, MessageSquareIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { TableView } from './floor-scene-model'
+import { isLate, type TableView } from './floor-scene-model'
 import { minutesSince, TABLE_STATE_STYLES } from './table-states'
 
 type TableLabelProps = {
@@ -16,15 +16,20 @@ type TableLabelProps = {
 export function TableLabel({ table, now, onSelect }: TableLabelProps) {
   const style = TABLE_STATE_STYLES[table.state]
   const count = table.orders.length
+  const late = isLate(table.state, table.since, now)
 
   return (
     <button
       type="button"
       onClick={() => onSelect(table.number)}
-      aria-label={`Table ${table.number} : ${style.label}${count > 0 ? `, ${count} commande${count > 1 ? 's' : ''}` : ''}`}
+      aria-label={`Table ${table.number} : ${style.label}${count > 0 ? `, ${count} commande${count > 1 ? 's' : ''}` : ''}${
+        late ? ', en retard' : ''
+      }`}
       className={cn(
         'pointer-events-auto flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap shadow-sm',
         style.badgeClass,
+        // Attente trop longue pour l'état de la table (cf. LATE_AFTER_MINUTES).
+        late && 'ring-2 ring-red-600 ring-offset-1',
       )}
     >
       T{table.number}

@@ -1,20 +1,34 @@
-import type { Order, UserRole } from '@app/shared'
+import type { ChatAuthor, Order, OrderJournalEvent, UserRole } from '@app/shared'
 import { Canvas } from '@react-three/fiber'
 import { LocateFixedIcon, Rotate3dIcon, ScanIcon } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { useNow } from '@/lib/use-now'
 import type { ConnectionState } from '@/lib/use-realtime-socket'
 import { Button } from '@/components/ui/button'
-import { FLOOR_TABLES, KITCHEN_LABEL_POSITION, PASS_LABEL_POSITION } from './floor-plan-data'
-import { buildScene } from './floor-scene-model'
+import {
+  FLOOR_TABLES,
+  KITCHEN_COUNTER_Z,
+  KITCHEN_LABEL_POSITION,
+  PASS_COUNTER,
+  PASS_LABEL_POSITION,
+} from './floor-plan-data'
+import { buildScene, placeStaff } from './floor-scene-model'
+import { admitEffect, effectOfEvent } from './order-effects'
 import { LabelProjector, SceneLabel, type LabelAnchors } from './scene-labels'
 import { TableLabel } from './table-label'
-import { CameraRig, type CameraMode } from './scene/camera-rig'
+import { CameraRig, type CameraFocus, type CameraMode } from './scene/camera-rig'
 import { DiningTable } from './scene/dining-table'
+import { Effects, type ActiveEffect } from './scene/effects'
 import { Room } from './scene/room'
+import { Staff } from './scene/staff'
 
 const CAMERA_MODE_STORAGE_KEY = 'floorPlan.cameraMode'
+
+// La cuisine voit d'abord sa zone : plan de travail, rail à tickets et passe.
+const KITCHEN_FOCUS: CameraFocus = { x: 0, z: (KITCHEN_COUNTER_Z + PASS_COUNTER.z) / 2, zoom: 1.8 }
+
+const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 function readCameraMode(): CameraMode {
   try {
@@ -27,6 +41,8 @@ function readCameraMode(): CameraMode {
 export type FloorPlan3DProps = {
   orders: Order[]
   unread: Record<string, number>
+  // Personnes connectées (présence du chat).
+  online: ChatAuthor[]
   role: UserRole
   connection: ConnectionState
   // Faux quand un dialog recouvre la scène.
@@ -35,6 +51,8 @@ export type FloorPlan3DProps = {
   // Le navigateur a retiré le contexte WebGL (onglet en arrière-plan, mémoire) :
   // la vue appelante repasse sur le kanban.
   onContextLost: () => void
+  // Événements reçus en direct (pas ceux d'un rattrapage), pour les animations.
+  subscribeToOrderEvents: (listener: (entry: OrderJournalEvent) => void) => () => void
 }
 
 /**
@@ -46,11 +64,13 @@ export type FloorPlan3DProps = {
 export default function FloorPlan3D({
   orders,
   unread,
+  online,
   role,
   connection,
   interactive,
   onSelectTable,
   onContextLost,
+  subscribeToOrderEvents,
 }: FloorPlan3DProps) {
   const scene = useMemo(() => buildScene(FLOOR_TABLES, orders, unread, role), [orders, unread, role])
   const now = useNow(15_000)
@@ -61,6 +81,36 @@ export default function FloorPlan3D({
   const cookingCount = scene.kitchenTickets.filter((order) => order.status === 'EN_PREPARATION').length
   const validatedCount = scene.kitchenTickets.length - cookingCount
   const [glCanvas, setGlCanvas] = useState<HTMLCanvasElement | null>(null)
+  const staff = useMemo(() => placeStaff(online), [online])
+
+  // Animations des événements en direct. L'état avant l'événement donne la
+  // table d'une commande (un changement de statut ne la porte pas, et une
+  // commande servie a déjà quitté l'état suivant).
+  const [effects, setEffects] = useState<ActiveEffect[]>([])
+  const ordersRef = useRef(orders)
+  const recentEffectsRef = useRef<number[]>([])
+  const nextEffectIdRef = useRef(0)
+
+  useEffect(() => {
+    ordersRef.current = orders
+  }, [orders])
+
+  useEffect(
+    () =>
+      subscribeToOrderEvents((entry) => {
+        if (document.hidden || prefersReducedMotion()) return
+        const effect = effectOfEvent(entry, FLOOR_TABLES, ordersRef.current)
+        if (!effect) return
+        const admitted = admitEffect(recentEffectsRef.current, performance.now())
+        if (!admitted) return
+        recentEffectsRef.current = admitted
+        const id = nextEffectIdRef.current++
+        setEffects((current) => [...current, { ...effect, id }])
+      }),
+    [subscribeToOrderEvents],
+  )
+
+  const removeEffect = useCallback((id: number) => setEffects((current) => current.filter((e) => e.id !== id)), [])
 
   // Perte du contexte WebGL pendant que le plan est affiché. L'écouteur est
   // retiré au démontage : React Three Fiber libère alors lui-même le contexte,
@@ -112,11 +162,18 @@ export default function FloorPlan3D({
       >
         <ambientLight intensity={1.4} />
         <directionalLight position={[6, 12, 4]} intensity={1.8} />
-        <CameraRig mode={cameraMode} resetSignal={resetSignal} enabled={interactive} />
+        <CameraRig
+          mode={cameraMode}
+          focus={role === 'COOK' ? KITCHEN_FOCUS : undefined}
+          resetSignal={resetSignal}
+          enabled={interactive}
+        />
         <Room kitchenTickets={scene.kitchenTickets} passPlates={scene.passPlates} />
         {scene.tables.map((table) => (
           <DiningTable key={table.number} table={table} onSelect={onSelectTable} />
         ))}
+        <Staff staff={staff} />
+        <Effects effects={effects} onDone={removeEffect} />
         <LabelProjector anchors={anchors} />
       </Canvas>
 
@@ -141,6 +198,13 @@ export default function FloorPlan3D({
             {validatedCount > 1 ? 's' : ''}
           </div>
         </SceneLabel>
+        {staff.map(({ user, x, z }) => (
+          <SceneLabel key={user.id} anchors={anchors} id={`staff:${user.id}`} position={[x, 1.75, z]}>
+            <span className="bg-background/80 rounded px-1 text-[10px] whitespace-nowrap">
+              {user.name.split(' ')[0]}
+            </span>
+          </SceneLabel>
+        ))}
         <SceneLabel anchors={anchors} id="pass" position={PASS_LABEL_POSITION}>
           <div className="bg-background/90 rounded-md px-2 py-1 text-xs whitespace-nowrap shadow-sm">
             <span className="font-semibold">Passe</span> ·{' '}

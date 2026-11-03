@@ -1,8 +1,9 @@
-import { canSeeAllOrders, OrderStatusErrorCode, type Order, type User } from '@app/shared'
+import { canSeeAllOrders, OrderStatusErrorCode, type Order, type OrderJournalEvent, type User } from '@app/shared'
 import { BoxIcon, KanbanIcon } from 'lucide-react'
 import { lazy, Suspense, useCallback, useState } from 'react'
 import { toast } from 'sonner'
 import { useAuth } from '@/lib/auth-context'
+import { createEventChannel } from '@/lib/event-channel'
 import { useChat } from '@/lib/use-chat'
 import { STATUS_LABELS } from '@/lib/order-status'
 import { useOrdersRealtime } from '@/lib/use-orders-realtime'
@@ -44,7 +45,11 @@ const CONNECTION_BADGES: Record<ConnectionState, { label: string; variant: 'seco
 export function OrderBoard({ user }: { user: User }) {
   const { accessToken, logout } = useAuth()
   const { socket, connection } = useRealtimeSocket(accessToken, logout)
-  const { orders, resync, createOrder, updateStatus } = useOrdersRealtime(socket)
+  // Événements reçus en direct, relayés au plan de salle pour ses animations.
+  const [liveOrderEvents] = useState(() => createEventChannel<OrderJournalEvent>())
+  const { orders, resync, createOrder, updateStatus } = useOrdersRealtime(socket, {
+    onLiveEvent: liveOrderEvents.emit,
+  })
   const chat = useChat(socket, user.role)
   const [pendingOrderId, setPendingOrderId] = useState<string | null>(null)
   const badge = CONNECTION_BADGES[connection]
@@ -168,11 +173,13 @@ export function OrderBoard({ user }: { user: User }) {
                 <FloorPlan3D
                   orders={orders}
                   unread={chat.unread}
+                  online={chat.online}
                   role={user.role}
                   connection={connection}
                   interactive={selectedTable === null}
                   onSelectTable={setSelectedTable}
                   onContextLost={fallBackToKanban}
+                  subscribeToOrderEvents={liveOrderEvents.subscribe}
                 />
               </Suspense>
             </ViewErrorBoundary>

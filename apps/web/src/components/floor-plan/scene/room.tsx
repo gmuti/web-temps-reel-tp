@@ -1,16 +1,21 @@
 import type { Order } from '@app/shared'
 import { Suspense, type ReactNode } from 'react'
 import { ViewErrorBoundary } from '@/components/view-error-boundary'
-import { KITCHEN, KITCHEN_COUNTER_Z, PASS_COUNTER, ROOM } from '../floor-plan-data'
+import {
+  COUNTER_HEIGHT,
+  KITCHEN,
+  KITCHEN_COUNTER_Z,
+  PASS_COUNTER,
+  PASS_HEIGHT,
+  ROOM,
+  TICKET_RAIL_Y,
+  TICKET_RAIL_Z,
+} from '../floor-plan-data'
 import { TABLE_STATE_STYLES } from '../table-states'
 import { KitModel, type KitModelName } from './kit-model'
 
 const WALL_HEIGHT = 1
 const WALL_THICKNESS = 0.15
-
-// Hauteurs des modules du kit une fois à l'échelle (plan de travail, comptoir du passe).
-const COUNTER_HEIGHT = 0.99
-const PASS_HEIGHT = 0.92
 
 // Plan de travail le long du mur du fond, de gauche à droite, en modules de 0,95 m,
 // puis le frigo. Le frigo (2 m) est à droite : dans le coin arrière gauche, le
@@ -205,7 +210,7 @@ export function Room({ kitchenTickets, passPlates }: RoomProps) {
       {kitchenTickets.slice(0, MAX_TICKETS).map((order, index) => (
         <mesh
           key={order.id}
-          position={[PASS_COUNTER.x - PASS_COUNTER.width / 2 + 0.35 + index * 0.57, 1.55, PASS_COUNTER.z - 0.2]}
+          position={[PASS_COUNTER.x - PASS_COUNTER.width / 2 + 0.35 + index * 0.57, TICKET_RAIL_Y, TICKET_RAIL_Z]}
         >
           <boxGeometry args={[0.35, 0.45, 0.02]} />
           <meshStandardMaterial

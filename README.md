@@ -37,6 +37,12 @@ dans [`docs/sujet.md`](docs/sujet.md).
 
 **Pour tout le monde**
 - Tableau en **kanban** : À valider, Validée, En préparation, Prête.
+- **Plan de salle 3D** (bouton « Plan », à côté du kanban) : vue isométrique
+  de la salle où chaque table prend la couleur de sa commande la plus urgente,
+  avec le nombre de commandes, le temps d'attente et les messages non lus ;
+  assiettes prêtes sur le passe, tickets et fourneaux en cuisine. Un clic sur
+  une table ouvre ses commandes, avec les mêmes actions que le kanban, et
+  permet d'en créer une pour cette table. Caméra isométrique fixe ou libre.
 - Sur chaque commande : carrousel des photos des plats, contraintes en badge.
 - **Chat d'équipe** : canal Général, canaux Cuisine et Salle selon le rôle, et
   une discussion par commande ; historique, auteur et heure de chaque message,
@@ -118,6 +124,15 @@ Côté front (`apps/web/src`) : `lib/use-realtime-socket.ts` (connexion et
 accusés de réception), `lib/use-orders-realtime.ts` (tableau et rattrapage),
 `lib/use-chat.ts` (chat et présence), et les composants du kanban, du
 formulaire de commande et du chat.
+
+Le plan de salle (`components/floor-plan/`) est une seconde vue branchée sur
+le même état qu'`OrderBoard` : il ne se connecte pas au socket.
+`floor-scene-model.ts` déduit l'état de chaque table des commandes (fonction
+pure, testée) et la scène React Three Fiber ne fait que l'afficher. Le plan est
+statique (`floor-plan-data.ts`) ; les commandes dont la table n'y figure pas
+apparaissent dans « Hors plan ». three étant lourd (~260 Ko gzip), la vue est
+chargée à la demande, rendue seulement quand quelque chose change, et
+remplacée par le kanban si WebGL est indisponible ou perdu.
 
 ## Règles métier
 
@@ -262,6 +277,9 @@ npm run lint
 
 Ils peuvent aussi être lancés dans le conteneur :
 `docker compose exec api npm run test:e2e --workspace apps/api`.
+
+Côté front, `npm test --workspace apps/web` lance les tests unitaires (Vitest)
+du modèle du plan de salle.
 
 ## Dépannage
 

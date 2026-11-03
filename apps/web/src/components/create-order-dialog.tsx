@@ -23,19 +23,27 @@ type Selection = Record<string, { quantity: number; note: string }>
 type CreateOrderDialogProps = {
   // Envoie la commande ; la nouvelle carte apparaît via l'événement `order:created`.
   onSubmit: (input: CreateOrderRequest) => Promise<unknown>
+  // Table préremplie (commande créée depuis le plan de salle).
+  defaultTableNumber?: number
+  triggerLabel?: string
 }
 
-export function CreateOrderDialog({ onSubmit }: CreateOrderDialogProps) {
+export function CreateOrderDialog({
+  onSubmit,
+  defaultTableNumber,
+  triggerLabel = 'Nouvelle commande',
+}: CreateOrderDialogProps) {
+  const initialTableNumber = defaultTableNumber?.toString() ?? ''
   const [open, setOpen] = useState(false)
   const [dishes, setDishes] = useState<Dish[] | null>(null)
-  const [tableNumber, setTableNumber] = useState('')
+  const [tableNumber, setTableNumber] = useState(initialTableNumber)
   const [comment, setComment] = useState('')
   const [selection, setSelection] = useState<Selection>({})
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const resetForm = () => {
-    setTableNumber('')
+    setTableNumber(initialTableNumber)
     setComment('')
     setSelection({})
     setError(null)
@@ -103,7 +111,7 @@ export function CreateOrderDialog({ onSubmit }: CreateOrderDialogProps) {
       <DialogTrigger asChild>
         <Button>
           <PlusIcon />
-          Nouvelle commande
+          {triggerLabel}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-3xl">

@@ -73,7 +73,7 @@ export function useFloorEditor(plan: FloorPlan | null, reloadPlan: () => Promise
       cancel()
     } catch (err) {
       if (err instanceof ApiError && err.errorCode === FloorPlanErrorCode.FLOOR_PLAN_CONFLICT) {
-        toast.warning(`${err.message} Plan rechargé : vos modifications sont abandonnées.`)
+        toast.warning(`${err.message} Plan rechargé : tes modifications sont abandonnées.`)
         cancel()
         await reloadPlan()
       } else {

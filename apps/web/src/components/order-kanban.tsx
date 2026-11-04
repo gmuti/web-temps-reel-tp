@@ -12,13 +12,34 @@ type OrderKanbanProps = {
   pendingOrderId: string | null
   onStatusChange: (order: Order, status: Order['status']) => void
   onOpenDiscussion: (order: Order) => void
+  // L'état vide n'est annoncé qu'une fois connecté, pour ne pas le montrer avant la synchronisation.
+  isConnected: boolean
 }
 
 /**
  * Vue kanban des commandes en cours. Elle ne fait qu'afficher : l'état et les
  * actions viennent d'OrderBoard, partagés avec les autres vues.
  */
-export function OrderKanban({ orders, role, pendingOrderId, onStatusChange, onOpenDiscussion }: OrderKanbanProps) {
+export function OrderKanban({
+  orders,
+  role,
+  pendingOrderId,
+  onStatusChange,
+  onOpenDiscussion,
+  isConnected,
+}: OrderKanbanProps) {
+  const isTrackEmpty = isConnected && !orders.some((order) => KANBAN_COLUMNS.includes(order.status))
+
+  // Aucune commande en cours : un seul message plutôt que quatre colonnes vides.
+  if (isTrackEmpty) {
+    return (
+      <main className="bg-muted/50 flex min-h-[320px] flex-col items-center justify-center gap-1 rounded-2xl p-8 text-center">
+        <p className="text-[22px] font-extrabold">Rien sur la piste.</p>
+        <p className="text-muted-foreground text-[15px]">Profite du calme.</p>
+      </main>
+    )
+  }
+
   return (
     <main className="grid auto-cols-[minmax(15rem,1fr)] grid-flow-col gap-4 overflow-x-auto pb-2">
       {KANBAN_COLUMNS.map((status) => {

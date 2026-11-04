@@ -1,20 +1,14 @@
-import type { ChatAuthor, ChatMessageCreatedEvent, UserRole } from '@app/shared'
+import type { ChatAuthor, ChatMessageCreatedEvent } from '@app/shared'
 import { SendIcon, XIcon } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { toast } from 'sonner'
+import { ROLE_LABELS } from '@/lib/role-labels'
 import type { ChatChannel } from '@/lib/use-chat'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-
-const ROLE_LABELS: Record<UserRole, string> = {
-  RESPONSABLE: 'Responsable',
-  MANAGER: 'Manager',
-  WAITER: 'Salle',
-  COOK: 'Cuisine',
-}
 
 const timeFormat = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' })
 
@@ -127,7 +121,7 @@ export function ChatPanel({
             return (
               <div key={message.messageId} className={cn('flex flex-col gap-0.5', isMine && 'items-end')}>
                 <div className="text-muted-foreground text-xs">
-                  {isMine ? 'Vous' : message.author.name} · {ROLE_LABELS[message.author.role]} ·{' '}
+                  {isMine ? 'Toi' : message.author.name} · {ROLE_LABELS[message.author.role]} ·{' '}
                   <time dateTime={message.createdAt.toISOString()}>{timeFormat.format(message.createdAt)}</time>
                 </div>
                 <p
@@ -146,6 +140,7 @@ export function ChatPanel({
 
       <form onSubmit={handleSubmit} className="flex gap-2 border-t p-3">
         <Input
+          className="h-11"
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           placeholder={isConnected ? 'Écrire un message…' : 'Connexion perdue…'}
@@ -153,7 +148,7 @@ export function ChatPanel({
           disabled={!isConnected}
           aria-label="Message"
         />
-        <Button type="submit" size="icon" disabled={!isConnected || isSending || !draft.trim()} aria-label="Envoyer">
+        <Button type="submit" size="icon-lg" disabled={!isConnected || isSending || !draft.trim()} aria-label="Envoyer">
           <SendIcon />
         </Button>
       </form>

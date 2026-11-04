@@ -68,7 +68,7 @@ export function EditorPanel({
                   const next = Number(event.target.value)
                   if (Number.isInteger(next) && next > 0) onRenumber(selected.number, next)
                 }}
-                className="h-8"
+                className="h-10"
               />
             </div>
             <div className="flex flex-col gap-1">

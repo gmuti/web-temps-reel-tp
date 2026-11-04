@@ -5,7 +5,8 @@ import { useDocumentTitle } from '@/lib/use-document-title'
 // Landing publique du restaurant (handoff § 5). Dans le chunk d'entrée : aucune dépendance
 // à l'API, à l'auth ni à Three.js. Les textes entre crochets sont des emplacements à remplir.
 
-// Jointure de classes sans tailwind-merge (lib/utils.cn) : la landing est dans le chunk d'entrée.
+// Jointure de classes locale : importer lib/utils (paquet cn) ici le partagerait avec les chunks lazy
+// et ajouterait un second fichier JS au chargement de la landing.
 const cn = (...classes: (string | false | undefined)[]) => classes.filter(Boolean).join(' ')
 
 const CONTAINER = 'mx-auto w-full max-w-[1320px] px-6'

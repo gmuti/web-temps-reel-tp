@@ -181,6 +181,7 @@ export function CreateOrderDialog({
                         </div>
                         {quantity > 0 && (
                           <Input
+                            className="h-11"
                             placeholder="Contrainte (sans oignon…)"
                             value={selection[dish.id]?.note ?? ''}
                             onChange={(event) => setNote(dish.id, event.target.value)}

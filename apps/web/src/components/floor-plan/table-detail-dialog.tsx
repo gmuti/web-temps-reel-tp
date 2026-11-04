@@ -66,7 +66,7 @@ export function TableDetailDialog({
             {tableOrders.length === 0
               ? canSeeAllOrders(role)
                 ? 'Aucune commande en cours.'
-                : 'Aucune commande en cours de votre part.'
+                : 'Aucune commande en cours de ta part.'
               : `${tableOrders.length} commande${tableOrders.length > 1 ? 's' : ''} en cours`}
           </DialogDescription>
         </DialogHeader>

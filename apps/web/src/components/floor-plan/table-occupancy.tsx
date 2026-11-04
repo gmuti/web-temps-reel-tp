@@ -54,7 +54,7 @@ export function TableOccupancy({ occupancy, role, hasActiveOrders, isPending, on
                 max={TABLE_GUESTS_MAX}
                 value={guests}
                 onChange={(event) => setGuests(event.target.value)}
-                className="h-8 w-16"
+                className="h-11 w-20"
               />
               <Button
                 size="sm"

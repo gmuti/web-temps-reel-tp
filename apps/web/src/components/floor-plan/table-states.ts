@@ -6,7 +6,7 @@ import type { TableVisualState } from './floor-scene-model'
 export const TABLE_STATE_STYLES: Record<TableVisualState, { label: string; color: string; badgeClass: string }> = {
   free: { label: 'Libre', color: '#94a3b8', badgeClass: 'bg-background text-muted-foreground' },
   unknown: {
-    label: 'Pas de commande de votre part',
+    label: 'Pas de commande de ta part',
     color: '#cbd5e1',
     badgeClass: 'bg-background/80 text-muted-foreground',
   },

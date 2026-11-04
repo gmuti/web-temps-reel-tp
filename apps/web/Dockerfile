@@ -28,5 +28,7 @@ RUN npm run build
 
 # ---- Image de production ----
 FROM nginx:alpine AS prod
+# Repli SPA et règles de cache (cf. apps/web/nginx.conf).
+COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/apps/web/dist /usr/share/nginx/html
 CMD ["nginx", "-g", "daemon off;"]

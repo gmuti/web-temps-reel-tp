@@ -575,6 +575,10 @@ Les tests de l'API peuvent aussi être lancés dans le conteneur :
 
 ## Crédits
 
+- Photos des plats et du site : [Wikimedia Commons](https://commons.wikimedia.org),
+  sous licences libres (CC0, domaine public, CC BY, CC BY-SA). Auteurs, licences
+  et sources sont listés dans [`docs/CREDITS-PHOTOS.md`](docs/CREDITS-PHOTOS.md),
+  et les crédits du site figurent en pied de page de la landing.
 - Mobilier 3D : [Furniture Kit de Kenney](https://kenney.nl/assets/furniture-kit),
   licence CC0 (`apps/web/public/models/kenney-furniture/License.txt`).
 - Polices : Shrikhand et Bricolage Grotesque, licence SIL Open Font License,

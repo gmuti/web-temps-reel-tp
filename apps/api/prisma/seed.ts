@@ -18,14 +18,14 @@ const DEMO_USERS = [
 // Carte de démo. Les images sont des illustrations servies par le front
 // (apps/web/public/dishes) : elles peuvent être remplacées par de vraies photos.
 const DEMO_DISHES = [
-  { name: 'Burger maison', price: 14.5, imageUrl: '/dishes/burger.svg' },
-  { name: 'Pizza Margherita', price: 12, imageUrl: '/dishes/pizza.svg' },
-  { name: 'Salade César', price: 11, imageUrl: '/dishes/salade-cesar.svg' },
-  { name: 'Ramen', price: 13.5, imageUrl: '/dishes/ramen.svg' },
-  { name: 'Steak frites', price: 18, imageUrl: '/dishes/steak-frites.svg' },
-  { name: 'Risotto aux champignons', price: 16, imageUrl: '/dishes/risotto.svg' },
-  { name: 'Tiramisu', price: 7, imageUrl: '/dishes/tiramisu.svg' },
-  { name: 'Limonade maison', price: 4.5, imageUrl: '/dishes/limonade.svg' },
+  { name: 'Burger maison', price: 14.5, imageUrl: '/dishes/burger.jpg' },
+  { name: 'Pizza Margherita', price: 12, imageUrl: '/dishes/pizza.jpg' },
+  { name: 'Salade César', price: 11, imageUrl: '/dishes/salade-cesar.jpg' },
+  { name: 'Ramen', price: 13.5, imageUrl: '/dishes/ramen.jpg' },
+  { name: 'Steak frites', price: 18, imageUrl: '/dishes/steak-frites.jpg' },
+  { name: 'Risotto aux champignons', price: 16, imageUrl: '/dishes/risotto.jpg' },
+  { name: 'Tiramisu', price: 7, imageUrl: '/dishes/tiramisu.jpg' },
+  { name: 'Limonade maison', price: 4.5, imageUrl: '/dishes/limonade.jpg' },
 ];
 
 // Plan de salle de démo (positions en mètres, cf. shared/src/floor.ts) : trois

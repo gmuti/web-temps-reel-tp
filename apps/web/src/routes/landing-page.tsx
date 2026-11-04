@@ -3,7 +3,8 @@ import { Link } from 'react-router'
 import { useDocumentTitle } from '@/lib/use-document-title'
 
 // Landing publique du restaurant (handoff § 5). Dans le chunk d'entrée : aucune dépendance
-// à l'API, à l'auth ni à Three.js. Les textes entre crochets sont des emplacements à remplir.
+// à l'API, à l'auth ni à Three.js. Les textes entre crochets sont des emplacements à remplir ;
+// les photos sont sous licence libre (cf. docs/CREDITS-PHOTOS.md).
 
 // Jointure de classes locale : importer lib/utils (paquet cn) ici le partagerait avec les chunks lazy
 // et ajouterait un second fichier JS au chargement de la landing.
@@ -24,20 +25,47 @@ const DISHES = [
   {
     name: 'La Carbo Turbo',
     description: 'Guanciale croustillant, jaune d’œuf, pecorino. Zéro crème, zéro compromis.',
-    photo: '[Photo : la Carbo Turbo]',
+    image: '/landing/carbo-turbo.jpg',
+    alt: 'Assiette de spaghetti carbonara au guanciale, parsemée de fromage râpé',
     tint: 'bg-[#ffe58a]',
   },
   {
     name: 'Pizza Pit-Stop',
     description: 'Tomate, mozzarella, basilic. Quatre-vingt-dix secondes au four, montre en main.',
-    photo: '[Photo : la Pizza Pit-Stop]',
+    image: '/landing/pizza-pit-stop.jpg',
+    alt: 'Pizza margherita à pâte gonflée, mozzarella et feuilles de basilic',
     tint: 'bg-[#ffcfc2]',
   },
   {
     name: 'Tiramisu Tour d’honneur',
     description: 'Le dessert qu’on mérite après avoir tout fini. Servi à la cuillère, généreusement.',
-    photo: '[Photo : le Tiramisu Tour d’honneur]',
+    image: '/landing/tiramisu-tour-honneur.jpg',
+    alt: 'Part de tiramisu en couches, saupoudrée de cacao et décorée de chocolat',
     tint: 'bg-[#d3d9ff]',
+  },
+]
+
+// Attribution des photos du site (licences CC BY et domaine public).
+const PHOTO_CREDITS = [
+  {
+    label: 'Chef flambant une poêle, U.S. Navy',
+    license: 'domaine public',
+    href: 'https://commons.wikimedia.org/wiki/File:Flickr_-_Official_U.S._Navy_Imagery_-_Navy_chef_takes_part_in_culinary_competition..jpg',
+  },
+  {
+    label: 'Carbonara, jeffreyw',
+    license: 'CC BY 2.0',
+    href: 'https://commons.wikimedia.org/wiki/File:Spaghetti_Carbonara_2015.jpg',
+  },
+  {
+    label: 'Pizza margherita, ノボホショコロトソ',
+    license: 'CC BY 4.0',
+    href: 'https://commons.wikimedia.org/wiki/File:Pizza_Margherita_%E3%83%94%E3%82%B6%E3%83%BB%E3%83%9E%E3%83%AB%E3%82%B2%E3%83%AA%E3%83%BC%E3%82%BF.jpg',
+  },
+  {
+    label: 'Tiramisu, Sarah Stierch',
+    license: 'CC BY 4.0',
+    href: 'https://commons.wikimedia.org/wiki/File:Tiramisu_-_Bistro_Don_Giovanni_-_Sarah_Stierch_2018_02.jpg',
   },
 ]
 
@@ -189,8 +217,17 @@ function Hero() {
         </div>
 
         <div className="relative mx-auto w-full max-w-[460px] lg:mr-0">
-          <div className="bg-brand-yellow text-brand-ink flex aspect-[4/5] rotate-3 items-center justify-center rounded-[28px] p-8 text-center text-[17px] font-semibold">
-            [Photo : la poêle qui flambe en cuisine]
+          <div className="bg-brand-yellow aspect-[4/5] rotate-3 overflow-hidden rounded-[28px]">
+            {/* Image principale du héros : chargée en priorité (au-dessus de la ligne de flottaison). */}
+            <img
+              src="/landing/heros-poele-flambee.jpg"
+              alt="Un chef en toque fait flamber une poêle, les flammes montent bien au-dessus du feu"
+              width={960}
+              height={1200}
+              fetchPriority="high"
+              decoding="async"
+              className="size-full object-cover"
+            />
           </div>
           <p className="font-display bg-brand-orange text-brand-ink absolute -bottom-8 -left-2 flex size-[150px] -rotate-12 items-center justify-center rounded-full p-4 text-center text-[24px] leading-tight sm:-left-10">
             Chaud devant{' '}!
@@ -221,13 +258,17 @@ function Menu() {
           {DISHES.map((dish) => (
             <li key={dish.name}>
               <article className="flex flex-col gap-4">
-                <div
-                  className={cn(
-                    'text-brand-ink flex aspect-square items-center justify-center rounded-[24px] p-6 text-center text-[17px] font-semibold',
-                    dish.tint,
-                  )}
-                >
-                  {dish.photo}
+                {/* Fond pastel visible le temps du chargement de la photo. */}
+                <div className={cn('aspect-square overflow-hidden rounded-[24px]', dish.tint)}>
+                  <img
+                    src={dish.image}
+                    alt={dish.alt}
+                    width={900}
+                    height={900}
+                    loading="lazy"
+                    decoding="async"
+                    className="size-full object-cover"
+                  />
                 </div>
                 <div className="flex items-baseline justify-between gap-4">
                   <h3 className="text-brand-ink text-[30px] leading-tight font-extrabold">{dish.name}</h3>
@@ -281,7 +322,7 @@ function SiteFooter() {
 
   return (
     <footer className="bg-brand-ink text-white">
-      <div className={cn(CONTAINER, 'flex flex-col gap-8 py-14 md:flex-row md:items-center md:justify-between')}>
+      <div className={cn(CONTAINER, 'flex flex-col gap-8 pt-14 pb-8 md:flex-row md:items-center md:justify-between')}>
         <p className="font-display text-brand-yellow text-[40px] leading-none">Poêle Position</p>
         <nav aria-label="Pied de page" className="flex flex-wrap gap-x-8 gap-y-1">
           <a href="#carte" className={footerLink}>
@@ -294,6 +335,28 @@ function SiteFooter() {
             Espace équipe
           </Link>
         </nav>
+      </div>
+      {/* Crédits des photos (licences libres, cf. docs/CREDITS-PHOTOS.md). */}
+      <div className={cn(CONTAINER, 'border-t border-white/15 py-6')}>
+        <p className="text-[14px] leading-relaxed text-white/75">
+          Photos : Wikimedia Commons.{' '}
+          {PHOTO_CREDITS.map((credit, index) => (
+            <span key={credit.href}>
+              {index > 0 && ' · '}
+              <a
+                href={credit.href}
+                className={cn(
+                  'rounded-sm underline underline-offset-2 hover:text-white',
+                  'focus-visible:outline-2',
+                  FOCUS_ON_INK,
+                )}
+              >
+                {credit.label}
+              </a>{' '}
+              ({credit.license})
+            </span>
+          ))}
+        </p>
       </div>
     </footer>
   )

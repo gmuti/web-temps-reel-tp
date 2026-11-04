@@ -10,6 +10,16 @@ export const STATUS_LABELS: Record<Order['status'], string> = {
   ANNULEE: 'Annulée',
 }
 
+// Libellé du bouton qui demande la transition vers chaque statut.
+export const TRANSITION_LABELS: Record<Order['status'], string> = {
+  A_VALIDER: '',
+  VALIDEE: 'Valider',
+  EN_PREPARATION: 'Prendre en charge',
+  PRETE: 'Marquer prête',
+  SERVIE: 'Marquer servie',
+  ANNULEE: 'Annuler',
+}
+
 // Libellés de l'occupation des tables.
 export const TABLE_STATUS_LABELS: Record<TableStatus, string> = {
   LIBRE: 'Libre',

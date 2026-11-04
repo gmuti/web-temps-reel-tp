@@ -16,11 +16,18 @@ const CONNECTION_STATUS: Record<ConnectionState, { label: string; dot: string }>
   offline: { label: 'Hors ligne', dot: 'bg-destructive' },
 }
 
+// Éléments flottants au-dessus de la scène (handoff § 3.4) : fond blanc, pilule, ombre portée.
+const FLOATING = 'bg-background pointer-events-auto rounded-full shadow-[0_6px_18px_-8px_rgba(0,0,0,0.35)]'
+
 type AppHeaderProps = {
   user: User
   connection: ConnectionState
   view: BoardView
   canShowPlan: boolean
+  // Mode Plan : barre flottante au-dessus de la scène, éléments en pilules blanches.
+  floating?: boolean
+  // Largeur (px) recouverte à droite par le panneau de table : la barre flottante s'arrête avant.
+  rightInset?: number
   onChangeView: (view: BoardView) => void
   onPreloadPlan: () => void
   onLogout: () => void
@@ -35,6 +42,8 @@ export function AppHeader({
   connection,
   view,
   canShowPlan,
+  floating = false,
+  rightInset = 0,
   onChangeView,
   onPreloadPlan,
   onLogout,
@@ -44,13 +53,24 @@ export function AppHeader({
   const identity = `${firstName} · ${ROLE_LABELS[user.role]}`
 
   return (
-    <header className="bg-background border-b">
-      <div className="mx-auto flex h-16 max-w-screen-2xl items-center gap-2 px-4 sm:gap-4 sm:px-6">
-        <p className="font-display text-brand-blue text-[18px] leading-none whitespace-nowrap min-[400px]:text-[20px] sm:text-[28px]">
+    <header className={floating ? 'pointer-events-none absolute inset-x-0 top-0 z-30' : 'bg-background border-b'}>
+      <div
+        className={cn(
+          'flex h-16 items-center gap-2',
+          floating ? 'px-3 pt-2 sm:px-4' : 'mx-auto max-w-screen-2xl px-4 sm:gap-4 sm:px-6',
+        )}
+        style={rightInset > 0 ? { paddingRight: rightInset + 16 } : undefined}
+      >
+        <p
+          className={cn(
+            'font-display text-brand-blue text-[18px] leading-none whitespace-nowrap min-[400px]:text-[20px] sm:text-[28px]',
+            floating && `${FLOATING} flex h-12 items-center px-3 sm:px-5`,
+          )}
+        >
           Poêle Position
         </p>
 
-        <div className="ml-auto flex items-center gap-1.5 sm:gap-3">
+        <div className={cn('ml-auto flex items-center gap-1.5 sm:gap-3', floating && `${FLOATING} p-1`)}>
           {canShowPlan && (
             <div role="group" aria-label="Affichage" className="bg-muted flex rounded-full p-1">
               <ViewToggle active={view === 'kanban'} onClick={() => onChangeView('kanban')} label="Tableau">

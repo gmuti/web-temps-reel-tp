@@ -13,6 +13,8 @@ import { Input } from '@/components/ui/input'
 const timeFormat = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' })
 
 type ChatPanelProps = {
+  // Hauteur et position, imposées par le conteneur (panneau rétractable du mode Plan).
+  className?: string
   currentUserId: string
   isConnected: boolean
   channels: ChatChannel[]
@@ -26,6 +28,7 @@ type ChatPanelProps = {
 }
 
 export function ChatPanel({
+  className,
   currentUserId,
   isConnected,
   channels,
@@ -63,7 +66,7 @@ export function ChatPanel({
   }
 
   return (
-    <Card className="flex h-[70svh] flex-col gap-0 py-0 lg:sticky lg:top-6 lg:h-[calc(100svh-3rem)]">
+    <Card className={cn('flex h-[70svh] flex-col gap-0 py-0 lg:sticky lg:top-6 lg:h-[calc(100svh-3rem)]', className)}>
       <CardHeader className="gap-2 border-b py-4">
         <CardTitle>Chat d'équipe</CardTitle>
         <div className="flex flex-wrap items-center gap-1 text-xs">

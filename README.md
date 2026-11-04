@@ -46,9 +46,14 @@ dans [`docs/sujet.md`](docs/sujet.md).
 - **Plan de salle 3D** (bouton « Plan », à côté du kanban) : vue isométrique
   de la salle où chaque table prend la couleur de sa commande la plus urgente,
   avec le nombre de commandes, le temps d'attente et les messages non lus ;
-  assiettes prêtes sur le passe, tickets et fourneaux en cuisine. Un clic sur
-  une table ouvre ses commandes, avec les mêmes actions que le kanban, et
-  permet d'en créer une pour cette table. Caméra isométrique fixe ou libre.
+  assiettes prêtes sur le passe, tickets et fourneaux en cuisine. Le plan
+  occupe tout l'écran, cadré automatiquement pour montrer toute la salle et la
+  cuisine ; des boutons recadrent la salle ou la cuisine et passent en caméra
+  libre, et le chat devient un panneau rétractable. Un clic sur une table
+  ouvre un panneau latéral (une feuille en bas sur mobile) et la caméra zoome
+  sur elle : état, temps écoulé, commandes avec les mêmes actions que le
+  kanban, et création d'une commande pour cette table. Échap, « Retour à la
+  salle » ou un clic dans le vide ramènent la vue d'ensemble.
   Les événements en direct sont animés (ticket qui part en cuisine, assiette du
   fourneau au passe puis du passe à la table, anneau sous une nouvelle
   commande), les tables en retard sont signalées, et les personnes connectées

@@ -12,16 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { DishCarousel } from '@/components/dish-carousel'
-
-// Libellé du bouton qui demande la transition vers chaque statut.
-const TRANSITION_LABELS: Record<Order['status'], string> = {
-  A_VALIDER: '',
-  VALIDEE: 'Valider',
-  EN_PREPARATION: 'Prendre en charge',
-  PRETE: 'Marquer prête',
-  SERVIE: 'Marquer servie',
-  ANNULEE: 'Annuler',
-}
+import { TRANSITION_LABELS } from '@/lib/order-status'
 
 const timeFormat = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' })
 

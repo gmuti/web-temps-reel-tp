@@ -9,25 +9,19 @@ import {
   type UserRole,
 } from '@app/shared'
 import { Canvas } from '@react-three/fiber'
-import { LocateFixedIcon, PencilIcon, Rotate3dIcon, ScanIcon } from 'lucide-react'
+import { ChefHatIcon, PencilIcon, Rotate3dIcon, ScanIcon } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { useNow } from '@/lib/use-now'
 import type { ConnectionState } from '@/lib/use-realtime-socket'
 import { Button } from '@/components/ui/button'
-import {
-  KITCHEN_COUNTER_Z,
-  KITCHEN_LABEL_POSITION,
-  PASS_COUNTER,
-  PASS_LABEL_POSITION,
-  STAFF_LABEL_Y,
-} from './floor-plan-data'
+import { KITCHEN_LABEL_POSITION, PASS_LABEL_POSITION, STAFF_LABEL_Y } from './floor-plan-data'
 import { EditorPanel } from './editor-panel'
 import { buildScene, placeStaff, type StaffView } from './floor-scene-model'
 import { admitEffect, effectOfEvent, effectOfTableEvent, type SceneEffect } from './order-effects'
 import { LabelProjector, SceneLabel, type LabelAnchors } from './scene-labels'
 import { TableLabel } from './table-label'
-import { CameraRig, type CameraFocus, type CameraMode } from './scene/camera-rig'
+import { CameraRig, type CameraMode, type CameraShot, type PanelLayout } from './scene/camera-rig'
 import { DiningTable } from './scene/dining-table'
 import { EditorScene } from './scene/editor-scene'
 import { Effects, type ActiveEffect } from './scene/effects'
@@ -38,8 +32,11 @@ import { useFloorEditor } from './use-floor-editor'
 
 const CAMERA_MODE_STORAGE_KEY = 'floorPlan.cameraMode'
 
-// La cuisine voit d'abord sa zone : plan de travail, rail à tickets et passe.
-const KITCHEN_FOCUS: CameraFocus = { x: 0, z: (KITCHEN_COUNTER_Z + PASS_COUNTER.z) / 2, zoom: 1.8 }
+// Au-delà de ce déplacement (en pixels), le geste est un glissé de caméra, pas un clic dans le vide.
+const CLICK_MAX_DRAG = 6
+
+// Éléments flottants au-dessus de la scène (handoff § 3.4) : fond blanc, pilule, ombre portée.
+const FLOATING = 'bg-background rounded-full shadow-[0_6px_18px_-8px_rgba(0,0,0,0.35)]'
 
 // Place réservée à gauche de la vue de dessus pour le panneau de l'éditeur (w-72 et marges).
 const EDITOR_PANEL_INSET = 312
@@ -67,9 +64,12 @@ export type FloorPlan3DProps = {
   online: ChatAuthor[]
   role: UserRole
   connection: ConnectionState
-  // Faux quand un dialog recouvre la scène.
-  interactive: boolean
+  // Table dont le panneau est ouvert : la caméra la centre à côté du panneau.
+  selectedTable: number | null
+  panel: PanelLayout
   onSelectTable: (tableNumber: number) => void
+  // Clic dans le vide (pas un glissé) ou bouton de cadrage : le panneau se ferme.
+  onDeselect: () => void
   // Le navigateur a retiré le contexte WebGL (onglet en arrière-plan, mémoire) :
   // la vue appelante repasse sur le kanban.
   onContextLost: () => void
@@ -94,8 +94,10 @@ export default function FloorPlan3D({
   online,
   role,
   connection,
-  interactive,
+  selectedTable,
+  panel,
   onSelectTable,
+  onDeselect,
   onContextLost,
   subscribeToOrderEvents,
   subscribeToTableEvents,
@@ -113,6 +115,8 @@ export default function FloorPlan3D({
   const now = useNow(15_000)
   const [cameraMode, setCameraMode] = useState<CameraMode>(readCameraMode)
   const [resetSignal, setResetSignal] = useState(0)
+  // Cadrage de base, repris à la fermeture du panneau : la cuisine pour le cuisinier, la salle sinon.
+  const [baseShot, setBaseShot] = useState<'room' | 'kitchen'>(role === 'COOK' ? 'kitchen' : 'room')
   const isOffline = connection !== 'connected'
   const [anchors] = useState<LabelAnchors>(() => new Map())
   const cookingCount = scene.kitchenTickets.filter((order) => order.status === 'EN_PREPARATION').length
@@ -241,6 +245,25 @@ export default function FloorPlan3D({
     orders.some((order) => order.tableNumber === tableNumber)
   const selectedDraft = editor.draft?.find((table) => table.number === editor.selected) ?? null
 
+  const selectedOnPlan = scene.tables.find((table) => table.number === selectedTable) ?? null
+  const shot: CameraShot = selectedOnPlan
+    ? { kind: 'table', x: selectedOnPlan.x, z: selectedOnPlan.z }
+    : { kind: baseShot }
+
+  const frame = (next: 'room' | 'kitchen') => {
+    onDeselect()
+    setBaseShot(next)
+    setResetSignal((n) => n + 1)
+  }
+
+  // Clic dans le vide : ferme le panneau, sauf à la fin d'un glissé de caméra.
+  const pointerDownRef = useRef<{ x: number; y: number } | null>(null)
+  const handlePointerMissed = (event: MouseEvent) => {
+    const down = pointerDownRef.current
+    if (down && Math.hypot(event.clientX - down.x, event.clientY - down.y) > CLICK_MAX_DRAG) return
+    if (selectedTable !== null) onDeselect()
+  }
+
   const toggleCameraMode = () => {
     const next = cameraMode === 'iso' ? 'free' : 'iso'
     setCameraMode(next)
@@ -256,7 +279,12 @@ export default function FloorPlan3D({
   if (floorPlanError) throw floorPlanError
 
   return (
-    <div className="bg-muted/50 relative h-[min(72svh,720px)] min-h-[420px] min-w-0 overflow-hidden rounded-lg">
+    <div
+      className="bg-muted absolute inset-0 overflow-hidden"
+      onPointerDownCapture={(event) => {
+        pointerDownRef.current = { x: event.clientX, y: event.clientY }
+      }}
+    >
       <Canvas
         orthographic
         camera={{ position: [30, 30, 30], zoom: 30, near: 0.1, far: 200 }}
@@ -265,15 +293,17 @@ export default function FloorPlan3D({
         className={cn('transition-[filter]', isOffline && 'grayscale')}
         style={{ touchAction: 'none' }}
         onCreated={({ gl }) => setGlCanvas(gl.domElement)}
+        onPointerMissed={handlePointerMissed}
       >
         <ambientLight intensity={1.4} />
         <directionalLight position={[6, 12, 4]} intensity={1.8} />
         <CameraRig
           mode={editing ? 'top' : cameraMode}
-          focus={role === 'COOK' ? KITCHEN_FOCUS : undefined}
+          shot={shot}
+          panel={panel}
           topInsetLeft={EDITOR_PANEL_INSET}
           resetSignal={resetSignal}
-          enabled={interactive && !editing}
+          enabled={!editing}
         />
         <Room kitchenTickets={scene.kitchenTickets} passPlates={scene.passPlates} />
         {editor.draft ? (
@@ -355,26 +385,37 @@ export default function FloorPlan3D({
       </div>
 
       {!editing && (
-        <div className="absolute top-3 right-3 flex gap-2">
-          {canRoleEditFloorPlan(role) && floorPlan && (
-            <Button size="sm" variant="outline" onClick={startEditing}>
-              <PencilIcon />
-              <span className="hidden sm:inline">Modifier le plan</span>
-            </Button>
-          )}
-          <Button size="sm" variant="outline" onClick={toggleCameraMode} aria-pressed={cameraMode === 'free'}>
-            {cameraMode === 'iso' ? <Rotate3dIcon /> : <ScanIcon />}
-            {cameraMode === 'iso' ? 'Caméra libre' : 'Vue iso'}
+        <div
+          role="group"
+          aria-label="Cadrage du plan"
+          className="absolute bottom-4 left-3 z-10 flex flex-wrap gap-2 sm:left-4"
+        >
+          <Button variant="ghost" className={FLOATING} onClick={() => frame('room')}>
+            <ScanIcon />
+            <span className="max-sm:sr-only">Voir toute la salle</span>
           </Button>
           <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setResetSignal((n) => n + 1)}
-            aria-label="Recentrer la vue"
+            variant="ghost"
+            className={cn(
+              FLOATING,
+              cameraMode === 'free' && 'bg-foreground text-background hover:bg-foreground/90 hover:text-background',
+            )}
+            onClick={toggleCameraMode}
+            aria-pressed={cameraMode === 'free'}
           >
-            <LocateFixedIcon />
-            <span className="hidden sm:inline">Recentrer</span>
+            <Rotate3dIcon />
+            <span className="max-sm:sr-only">Caméra libre</span>
           </Button>
+          <Button variant="ghost" className={FLOATING} onClick={() => frame('kitchen')}>
+            <ChefHatIcon />
+            <span className="max-sm:sr-only">Cuisine</span>
+          </Button>
+          {canRoleEditFloorPlan(role) && floorPlan && (
+            <Button variant="ghost" className={FLOATING} onClick={startEditing}>
+              <PencilIcon />
+              <span className="max-sm:sr-only">Modifier le plan</span>
+            </Button>
+          )}
         </div>
       )}
 
@@ -395,13 +436,13 @@ export default function FloorPlan3D({
       )}
 
       {!editing && tables?.length === 0 && (
-        <div className="bg-background/90 absolute top-3 left-3 max-w-xs rounded-lg p-2 text-xs shadow-sm">
+        <div className="bg-background/90 absolute top-20 left-3 max-w-xs rounded-2xl p-3 text-sm shadow-sm sm:left-4">
           Ce restaurant n'a pas encore de plan de salle : les commandes sont listées dans « Hors plan ».
         </div>
       )}
 
       {!editing && tables !== null && scene.offPlan.length > 0 && (
-        <div className="bg-background/90 absolute bottom-3 left-3 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-2 rounded-lg p-2 text-xs shadow-sm">
+        <div className="bg-background/90 absolute top-20 left-3 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-2 rounded-2xl p-2 pl-3 text-xs shadow-sm sm:left-4">
           <span className="font-semibold">Hors plan</span>
           {[...new Set(scene.offPlan.map((order) => order.tableNumber))].map((tableNumber) => (
             <Button key={tableNumber} size="xs" variant="outline" onClick={() => onSelectTable(tableNumber)}>

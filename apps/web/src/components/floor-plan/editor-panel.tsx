@@ -41,7 +41,7 @@ export function EditorPanel({
   onSave,
 }: EditorPanelProps) {
   return (
-    <div className="bg-background/95 absolute top-3 left-3 flex w-72 max-w-[calc(100%-1.5rem)] flex-col gap-3 rounded-lg p-3 text-sm shadow-md">
+    <div className="bg-background/95 absolute top-20 left-3 flex max-h-[calc(100%-6rem)] w-72 max-w-[calc(100%-1.5rem)] flex-col gap-3 overflow-y-auto rounded-2xl p-3 text-sm shadow-md">
       <div>
         <p className="font-semibold">Édition du plan</p>
         <p className="text-muted-foreground text-xs">Glissez les tables pour les déplacer (grille de 25 cm).</p>

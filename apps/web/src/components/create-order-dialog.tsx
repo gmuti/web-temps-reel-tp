@@ -26,12 +26,16 @@ type CreateOrderDialogProps = {
   // Table préremplie (commande créée depuis le plan de salle).
   defaultTableNumber?: number
   triggerLabel?: string
+  triggerVariant?: 'default' | 'outline'
+  triggerClassName?: string
 }
 
 export function CreateOrderDialog({
   onSubmit,
   defaultTableNumber,
   triggerLabel = 'Nouvelle commande',
+  triggerVariant = 'default',
+  triggerClassName,
 }: CreateOrderDialogProps) {
   const initialTableNumber = defaultTableNumber?.toString() ?? ''
   const [open, setOpen] = useState(false)
@@ -109,7 +113,7 @@ export function CreateOrderDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button>
+        <Button variant={triggerVariant} className={triggerClassName}>
           <PlusIcon />
           {triggerLabel}
         </Button>

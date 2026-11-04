@@ -3,8 +3,8 @@ import { Link } from 'react-router'
 import { useDocumentTitle } from '@/lib/use-document-title'
 
 // Landing publique du restaurant (handoff § 5). Dans le chunk d'entrée : aucune dépendance
-// à l'API, à l'auth ni à Three.js. Les textes entre crochets sont des emplacements à remplir ;
-// les photos sont sous licence libre (cf. docs/CREDITS-PHOTOS.md).
+// à l'API, à l'auth ni à Three.js. Prix et coordonnées sont fictifs ; les photos sont sous
+// licence libre (cf. docs/CREDITS-PHOTOS.md).
 
 // Jointure de classes locale : importer lib/utils (paquet cn) ici le partagerait avec les chunks lazy
 // et ajouterait un second fichier JS au chargement de la landing.
@@ -25,6 +25,7 @@ const DISHES = [
   {
     name: 'La Carbo Turbo',
     description: 'Guanciale croustillant, jaune d’œuf, pecorino. Zéro crème, zéro compromis.',
+    price: '15 €',
     image: '/landing/carbo-turbo.jpg',
     alt: 'Assiette de spaghetti carbonara au guanciale, parsemée de fromage râpé',
     tint: 'bg-[#ffe58a]',
@@ -32,6 +33,7 @@ const DISHES = [
   {
     name: 'Pizza Pit-Stop',
     description: 'Tomate, mozzarella, basilic. Quatre-vingt-dix secondes au four, montre en main.',
+    price: '12 €',
     image: '/landing/pizza-pit-stop.jpg',
     alt: 'Pizza margherita à pâte gonflée, mozzarella et feuilles de basilic',
     tint: 'bg-[#ffcfc2]',
@@ -39,13 +41,14 @@ const DISHES = [
   {
     name: 'Tiramisu Tour d’honneur',
     description: 'Le dessert qu’on mérite après avoir tout fini. Servi à la cuillère, généreusement.',
+    price: '7 €',
     image: '/landing/tiramisu-tour-honneur.jpg',
     alt: 'Part de tiramisu en couches, saupoudrée de cacao et décorée de chocolat',
     tint: 'bg-[#d3d9ff]',
   },
 ]
 
-// Attribution des photos du site (licences CC BY et domaine public).
+// Attribution des photos du site (licences libres, cf. docs/CREDITS-PHOTOS.md).
 const PHOTO_CREDITS = [
   {
     label: 'Chef flambant une poêle, U.S. Navy',
@@ -67,13 +70,20 @@ const PHOTO_CREDITS = [
     license: 'CC BY 4.0',
     href: 'https://commons.wikimedia.org/wiki/File:Tiramisu_-_Bistro_Don_Giovanni_-_Sarah_Stierch_2018_02.jpg',
   },
+  {
+    label: 'Salle de restaurant, Diego F. Parra',
+    license: 'CC BY-SA 4.0',
+    href: 'https://commons.wikimedia.org/wiki/File:Restaurant_dining_room_with_brick_walls_and_set_tables,_Colombia.jpg',
+  },
 ]
 
-const PRACTICAL_INFO = [
-  { term: 'Adresse', value: '[Adresse du restaurant]' },
-  { term: 'Horaires', value: '[Jours et horaires]' },
-  { term: 'Téléphone', value: '[Numéro]' },
-  { term: 'Accès', value: '[Transports à proximité]' },
+// Coordonnées fictives (restaurant de démonstration). Le numéro appartient à une
+// tranche que l'ARCEP réserve aux œuvres de fiction : il n'attribue aucune ligne réelle.
+const PRACTICAL_INFO: { term: string; lines: string[]; href?: string }[] = [
+  { term: 'Adresse', lines: ['8 rue du Grand-Prix', '75011 Paris'] },
+  { term: 'Horaires', lines: ['Du mardi au samedi', '12 h – 14 h 30 et 19 h – 23 h'] },
+  { term: 'Téléphone', lines: ['01 99 00 42 42'], href: 'tel:+33199004242' },
+  { term: 'Accès', lines: ['Métro à 3 minutes à pied', 'Arceaux vélo devant la porte'] },
 ]
 
 // Icônes du menu en SVG inline : importer lucide-react ici le partagerait avec les chunks lazy
@@ -272,7 +282,7 @@ function Menu() {
                 </div>
                 <div className="flex items-baseline justify-between gap-4">
                   <h3 className="text-brand-ink text-[30px] leading-tight font-extrabold">{dish.name}</h3>
-                  <p className="text-brand-ink shrink-0 text-[17px] font-bold tabular-nums">[Prix]</p>
+                  <p className="text-brand-ink shrink-0 text-[20px] font-extrabold tabular-nums">{dish.price}</p>
                 </div>
                 <p className="text-[17px] text-neutral-600">{dish.description}</p>
               </article>
@@ -287,7 +297,7 @@ function Menu() {
 function Garage() {
   return (
     <section id="garage" aria-labelledby="garage-title" className="bg-brand-yellow text-brand-ink scroll-mt-4">
-      <div className={cn(CONTAINER, 'grid gap-12 py-20 lg:grid-cols-2 lg:py-28')}>
+      <div className={cn(CONTAINER, 'grid items-center gap-14 py-20 lg:grid-cols-[1.15fr_0.85fr] lg:py-28')}>
         <div className="flex flex-col items-start gap-6">
           <h2 id="garage-title" className="font-display text-[clamp(48px,6vw,84px)] leading-[0.95]">
             Le garage
@@ -299,16 +309,48 @@ function Garage() {
           <a href="#garage" className={cn(PILL, 'bg-brand-blue text-white', FOCUS_ON_YELLOW)}>
             Réserver une table
           </a>
+
+          <dl className="mt-6 grid w-full gap-x-8 gap-y-6 sm:grid-cols-2">
+            {PRACTICAL_INFO.map((item) => (
+              <div key={item.term} className="border-brand-ink border-t-2 pt-4">
+                <dt className="text-[15px] font-extrabold tracking-wide uppercase">{item.term}</dt>
+                <dd className="mt-1 text-[17px] leading-snug">
+                  {item.href ? (
+                    <a
+                      href={item.href}
+                      className={cn(
+                        'rounded-sm font-semibold tabular-nums underline underline-offset-4 focus-visible:outline-3 focus-visible:outline-offset-2',
+                        FOCUS_ON_YELLOW,
+                      )}
+                    >
+                      {item.lines[0]}
+                    </a>
+                  ) : (
+                    item.lines.map((line) => (
+                      <span key={line} className="block">
+                        {line}
+                      </span>
+                    ))
+                  )}
+                </dd>
+              </div>
+            ))}
+          </dl>
         </div>
 
-        <dl className="grid content-start gap-x-8 gap-y-6 sm:grid-cols-2">
-          {PRACTICAL_INFO.map((item) => (
-            <div key={item.term} className="border-brand-ink border-t-2 pt-4">
-              <dt className="text-[15px] font-extrabold tracking-wide uppercase">{item.term}</dt>
-              <dd className="mt-1 text-[17px]">{item.value}</dd>
-            </div>
-          ))}
-        </dl>
+        <div className="mx-auto w-full max-w-[420px] lg:mr-0">
+          <div className="bg-brand-ink aspect-[4/5] -rotate-2 overflow-hidden rounded-[28px]">
+            <img
+              src="/landing/salle-restaurant.jpg"
+              alt="La salle : banquette capitonnée en cuir, murs de briques et tables en bois dressées"
+              width={800}
+              height={1000}
+              loading="lazy"
+              decoding="async"
+              className="size-full object-cover"
+            />
+          </div>
+        </div>
       </div>
     </section>
   )
@@ -339,7 +381,7 @@ function SiteFooter() {
       {/* Crédits des photos (licences libres, cf. docs/CREDITS-PHOTOS.md). */}
       <div className={cn(CONTAINER, 'border-t border-white/15 py-6')}>
         <p className="text-[14px] leading-relaxed text-white/75">
-          Photos : Wikimedia Commons.{' '}
+          Restaurant fictif, coordonnées de démonstration. Photos : Wikimedia Commons.{' '}
           {PHOTO_CREDITS.map((credit, index) => (
             <span key={credit.href}>
               {index > 0 && ' · '}

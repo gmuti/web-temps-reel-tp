@@ -26,6 +26,9 @@ modifiée, sous la même licence.
 | `carbo-turbo.jpg` | [Spaghetti Carbonara 2015](https://commons.wikimedia.org/wiki/File:Spaghetti_Carbonara_2015.jpg) | jeffreyw | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0) |
 | `pizza-pit-stop.jpg` | [Pizza Margherita](https://commons.wikimedia.org/wiki/File:Pizza_Margherita_%E3%83%94%E3%82%B6%E3%83%BB%E3%83%9E%E3%83%AB%E3%82%B2%E3%83%AA%E3%83%BC%E3%82%BF.jpg) | ノボホショコロトソ | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0) |
 | `tiramisu-tour-honneur.jpg` | [Tiramisu - Bistro Don Giovanni](https://commons.wikimedia.org/wiki/File:Tiramisu_-_Bistro_Don_Giovanni_-_Sarah_Stierch_2018_02.jpg) | Sarah Stierch (Missvain) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0) |
+| `salle-restaurant.jpg` | [Restaurant dining room with brick walls and set tables, Colombia](https://commons.wikimedia.org/wiki/File:Restaurant_dining_room_with_brick_walls_and_set_tables,_Colombia.jpg) | Diego F. Parra | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0) |
 
-Les photos illustrent des plats de démonstration : elles ne représentent pas
-les plats réels d'un restaurant « Poêle Position ».
+Les photos illustrent un restaurant de démonstration : elles ne représentent
+pas les plats ni la salle d'un restaurant réel. Les prix et les coordonnées
+affichés sur le site sont également fictifs ; le numéro de téléphone appartient
+à une tranche réservée par l'ARCEP aux œuvres de fiction.

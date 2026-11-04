@@ -97,7 +97,7 @@ Prise de commande, cuisine, plan de salle 3D et chat d'équipe, synchronisés pa
 
 - **Site public et connexion** : landing du restaurant (`/`), connexion (`/connexion`), application (`/service`), avec redirections selon l'état de connexion.
 - **Tableau kanban** : À valider, Validée, En préparation, Prête, mis à jour en direct.
-- **Plan de salle 3D en plein écran**
+- **Plan de salle 3D en plein écran** (vue par défaut)
   - Chaque table prend la couleur de sa commande la plus urgente, avec le nombre de commandes, le temps d'attente et les messages non lus ; les tables en retard sont signalées.
   - Cadrage automatique de toute la salle et de la cuisine, quel que soit le format de l'écran ; boutons « Voir toute la salle », « Caméra libre » et « Cuisine ».
   - Un clic sur une table ouvre un panneau latéral (une feuille en bas sur mobile) et la caméra zoome sur elle : état, temps écoulé, commande, historique, actions du kanban et nouvelle commande pour cette table. Échap, « Retour à la salle » ou un clic dans le vide ramènent la vue d'ensemble.
@@ -194,8 +194,10 @@ non connectée qui ouvre `/service` est renvoyée vers `/connexion`.
 
 ### Vue Plan
 
-- Bouton « Plan » dans l'en-tête : la scène occupe tout l'écran, salle et
-  cuisine entièrement visibles quel que soit le format de la fenêtre.
+- C'est la vue affichée par défaut après la connexion (le choix « Tableau »
+  est mémorisé ; sans WebGL, l'application reste sur le tableau). La scène
+  occupe tout l'écran, salle et cuisine entièrement visibles quel que soit le
+  format de la fenêtre.
 - En bas à gauche : « Voir toute la salle », « Caméra libre », « Cuisine ».
 - Clic sur une table : panneau à droite et zoom animé sur la table. Échap,
   « Retour à la salle » ou un clic dans le vide ramènent la vue d'ensemble.

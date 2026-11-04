@@ -36,11 +36,13 @@ const FloorPlan3D = lazy(loadFloorPlan)
 
 const VIEW_STORAGE_KEY = 'orderBoard.view'
 
+// Vue par défaut : le plan. Le tableau n'est affiché que si l'utilisateur l'a choisi
+// (choix mémorisé), ou si WebGL est indisponible (cf. canShowPlan).
 function readStoredView(): BoardView {
   try {
-    return localStorage.getItem(VIEW_STORAGE_KEY) === 'plan' ? 'plan' : 'kanban'
+    return localStorage.getItem(VIEW_STORAGE_KEY) === 'kanban' ? 'kanban' : 'plan'
   } catch {
-    return 'kanban'
+    return 'plan'
   }
 }
 

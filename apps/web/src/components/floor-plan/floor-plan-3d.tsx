@@ -319,7 +319,7 @@ export default function FloorPlan3D({
             {scene.tables.map((table) => (
               <DiningTable key={table.number} table={table} onSelect={onSelectTable} />
             ))}
-            <Staff staff={staff} trips={trips} anchors={anchors} onTripDone={endTrip} />
+            <Staff staff={staff} trips={trips} cookingCount={cookingCount} anchors={anchors} onTripDone={endTrip} />
             <Effects effects={effects} onDone={removeEffect} />
           </>
         )}
@@ -357,7 +357,7 @@ export default function FloorPlan3D({
                 id={`table:${table.number}`}
                 position={[table.x, 1.6, table.z]}
               >
-                <TableLabel table={table} now={now} onSelect={onSelectTable} />
+                <TableLabel table={table} now={now} role={role} onSelect={onSelectTable} />
               </SceneLabel>
             ))}
         <SceneLabel anchors={anchors} id="kitchen" position={KITCHEN_LABEL_POSITION}>

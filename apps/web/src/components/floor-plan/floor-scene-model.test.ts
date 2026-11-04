@@ -1,5 +1,6 @@
 import { orderChatChannel, type FloorTable, type Order, type TableState } from '@app/shared'
 import { describe, expect, it } from 'vitest'
+import { COOK_STATIONS } from './floor-plan-data'
 import { buildScene, isLate, placeStaff } from './floor-scene-model'
 
 const TABLES: FloorTable[] = [
@@ -116,12 +117,20 @@ describe('placeStaff', () => {
     role,
   })
 
-  it('place chaque rôle dans sa zone, côte à côte', () => {
+  it('place chaque rôle dans sa zone', () => {
     const staff = placeStaff([person('1', 'COOK'), person('2', 'WAITER'), person('3', 'COOK'), person('4', 'MANAGER')])
     expect(staff.map((member) => member.zone)).toEqual(['kitchen', 'floor', 'kitchen', 'office'])
-    const [firstCook, , secondCook] = staff
-    expect(secondCook.z).toBe(firstCook.z)
-    expect(secondCook.x).not.toBe(firstCook.x)
+  })
+
+  it('donne à chaque cuisinier un poste : les fourneaux, puis l’îlot', () => {
+    const cooks = placeStaff(['1', '2', '3', '4'].map((id) => person(id, 'COOK')))
+    expect(cooks.map((cook) => cook.station)).toEqual([0, 1, 2, 3])
+    expect(cooks.slice(0, 3).map(({ x, z }) => ({ x, z }))).toEqual(
+      COOK_STATIONS.slice(0, 3).map(({ x, z }) => ({ x, z })),
+    )
+    expect(COOK_STATIONS.slice(0, 3).every((station) => station.kind === 'stove')).toBe(true)
+    expect(COOK_STATIONS[3].kind).toBe('island')
+    expect(placeStaff([person('5', 'WAITER')])[0].station).toBeNull()
   })
 })
 

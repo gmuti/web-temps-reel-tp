@@ -58,8 +58,13 @@ dans [`docs/sujet.md`](docs/sujet.md).
   fourneau au passe puis du passe à la table, anneau sous une nouvelle
   commande), les tables en retard sont signalées, et les personnes connectées
   apparaissent dans leur zone (cuisine, salle, entrée) et se déplacent quand
-  elles agissent : à la table, au fourneau, au passe, par les allées. La
-  cuisine voit d'abord sa zone.
+  elles agissent : à la table, au passe, par les allées. La cuisine (trois
+  fourneaux au mur du fond, un îlot central, le passe à la séparation) voit
+  d'abord sa zone ; chaque cuisinier connecté a un poste et y cuisine en
+  boucle (poêle sautée au fourneau, saladier à l'îlot) tant qu'une commande
+  est en préparation, et les fourneaux actifs flambent et fument. Seuls les
+  états des tables sont en couleurs saturées, et seuls ceux sur lesquels le
+  rôle connecté peut agir clignotent.
   Le mobilier vient du [Furniture Kit de Kenney](https://kenney.nl/assets/furniture-kit)
   (CC0, licence dans `apps/web/public/models/kenney-furniture/`).
 - Sur chaque commande : carrousel des photos des plats, contraintes en badge.

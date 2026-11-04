@@ -65,13 +65,16 @@ function PrimitiveFurniture({ table }: { table: FloorTable }) {
   )
 }
 
+// Nappe blanc cassé au lieu du rose du kit (le rose rappelait les états).
+const TABLECLOTH_COLORS = { carpet: '#fffaf2' }
+
 // Mobilier du Furniture Kit : table nappée pour 4, petite table en bois pour 2
 // (la table du kit, raccourcie).
 function KitFurniture({ table }: { table: FloorTable }) {
   return (
     <group>
       {table.shape === 'long' ? (
-        <KitModel name="tableCloth" />
+        <KitModel name="tableCloth" materialColors={TABLECLOTH_COLORS} />
       ) : (
         <KitModel name="table" stretch={[TABLE_SIZE.small[0] / TABLE_SIZE.long[0], 1, 1]} />
       )}
@@ -87,8 +90,9 @@ function KitFurniture({ table }: { table: FloorTable }) {
   )
 }
 
-// Tenues des clients installés, alternées d'une chaise à l'autre.
-const GUEST_COLORS = ['#0ea5e9', '#f43f5e', '#84cc16', '#f59e0b']
+// Tenues des clients installés, alternées d'une chaise à l'autre : tons poudrés,
+// pour que seuls les états des tables soient saturés (handoff § 6.4).
+const GUEST_COLORS = ['#d6c7b4', '#b8c4c9', '#c9b8b0', '#a9b5a0']
 const SKIN = '#e0b48f'
 
 // Clients assis, un par couvert (toutes les places si le nombre n'est pas connu).

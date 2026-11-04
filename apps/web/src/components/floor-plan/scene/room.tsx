@@ -1,13 +1,20 @@
 import type { Order } from '@app/shared'
-import { Suspense, type ReactNode } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
+import { Suspense, useRef, type ReactNode } from 'react'
+import type { Group, Mesh } from 'three'
 import { ViewErrorBoundary } from '@/components/view-error-boundary'
 import {
   COUNTER_HEIGHT,
   KITCHEN,
   KITCHEN_COUNTER_Z,
+  kitchenModuleX,
+  MODULE_WIDTH,
   PASS_COUNTER,
   PASS_HEIGHT,
+  PREP_ISLAND,
   ROOM,
+  STOVE_MODULES,
+  STOVES_X,
   TICKET_RAIL_Y,
   TICKET_RAIL_Z,
 } from '../floor-plan-data'
@@ -18,32 +25,32 @@ const WALL_HEIGHT = 1
 const WALL_THICKNESS = 0.15
 
 // Plan de travail le long du mur du fond, de gauche à droite, en modules de 0,95 m,
-// puis le frigo. Le frigo (2 m) est à droite : dans le coin arrière gauche, le
-// plus haut de l'écran en vue iso, il sortirait du cadre.
-const MODULE_WIDTH = 0.946
-const KITCHEN_ROW_START_X = -7.15
-const KITCHEN_ROW: readonly KitModelName[] = [
-  'kitchenCabinet',
-  'kitchenCabinet',
-  'kitchenCabinet',
-  'kitchenStove',
-  'kitchenStove',
-  'kitchenCabinet',
-  'kitchenSink',
-  'kitchenCabinet',
-  'kitchenCabinet',
-  'kitchenStove',
-  'kitchenStove',
-  'kitchenCabinet',
-  'kitchenCabinet',
-  'kitchenCabinet',
-  'kitchenCabinet',
-]
-const moduleX = (index: number) => KITCHEN_ROW_START_X + index * MODULE_WIDTH
-// Fourneaux, dans l'ordre où ils s'allument quand des commandes passent en préparation.
-const STOVES_X = KITCHEN_ROW.flatMap((name, index) => (name === 'kitchenStove' ? [moduleX(index)] : []))
-const COFFEE_MACHINE_X = moduleX(12)
+// puis le frigo. Trois fourneaux espacés (STOVE_MODULES), un évier entre les deux
+// premiers. Le frigo (2 m) est à droite : dans le coin arrière gauche, le plus
+// haut de l'écran en vue iso, il sortirait du cadre.
+const KITCHEN_ROW: readonly KitModelName[] = Array.from({ length: 15 }, (_, index) =>
+  (STOVE_MODULES as readonly number[]).includes(index)
+    ? 'kitchenStove'
+    : index === 5
+      ? 'kitchenSink'
+      : 'kitchenCabinet',
+)
+const moduleX = kitchenModuleX
+const COFFEE_MACHINE_X = moduleX(13)
 const FRIDGE_X = 7.14
+
+// Îlot de préparation : 5 modules de comptoir et une extrémité de chaque côté.
+const ISLAND_MODULES = 5
+const islandModuleX = (index: number) => PREP_ISLAND.x + (index - (ISLAND_MODULES - 1) / 2) * MODULE_WIDTH
+const ISLAND_HALF_WIDTH = (ISLAND_MODULES * MODULE_WIDTH) / 2
+
+const FLAME_COLOR = '#ff7a1a'
+// Gris chaud : visible sur le plan de travail clair, distinct du gris « libre ».
+const SMOKE_COLOR = '#a8a29e'
+const SMOKE_PUFFS = 3
+const SMOKE_PERIOD_S = 2.4
+
+const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 // Passe : 7 modules de comptoir et une extrémité de chaque côté.
 const PASS_MODULES = 7
@@ -124,6 +131,69 @@ function PassFurniture() {
   )
 }
 
+function IslandFurniture() {
+  return (
+    <group>
+      {Array.from({ length: ISLAND_MODULES }, (_, index) => (
+        <KitModel key={index} name="kitchenBar" position={[islandModuleX(index), 0, PREP_ISLAND.z]} />
+      ))}
+      <KitModel
+        name="kitchenBarEnd"
+        position={[PREP_ISLAND.x - ISLAND_HALF_WIDTH - PASS_END_WIDTH / 2, 0, PREP_ISLAND.z]}
+      />
+      <KitModel
+        name="kitchenBarEnd"
+        position={[PREP_ISLAND.x + ISLAND_HALF_WIDTH + PASS_END_WIDTH / 2, 0, PREP_ISLAND.z]}
+        rotation-y={Math.PI}
+      />
+    </group>
+  )
+}
+
+// Feu d'un fourneau : éteint, ou flamme orange qui vacille et petite fumée qui monte.
+// Sans animation (prefers-reduced-motion) : flamme fixe, pas de fumée.
+function StoveFire({ x, lit }: { x: number; lit: boolean }) {
+  const flameRef = useRef<Mesh>(null)
+  const smokeRef = useRef<Group>(null)
+  const invalidate = useThree((state) => state.invalidate)
+  const animated = lit && !prefersReducedMotion()
+
+  useFrame(() => {
+    if (!animated) return
+    const t = performance.now() / 1000
+    const flame = flameRef.current
+    if (flame) flame.scale.y = 1 + 0.25 * Math.sin(t * 13 + x) * Math.sin(t * 7.3)
+    smokeRef.current?.children.forEach((puff, index) => {
+      const phase = (((t / SMOKE_PERIOD_S + index / SMOKE_PUFFS) % 1) + 1) % 1
+      puff.position.set(0.05 * Math.sin(t + index * 2), 0.15 + phase * 0.9, 0)
+      puff.scale.setScalar(0.6 + phase * 0.9)
+      const material = (puff as Mesh).material as { opacity: number }
+      material.opacity = 0.6 * (1 - phase)
+    })
+    invalidate()
+  })
+
+  if (!lit) return null
+  return (
+    <group position={[x, COUNTER_HEIGHT + 0.02, KITCHEN_COUNTER_Z]}>
+      <mesh ref={flameRef} position-y={0.06}>
+        <coneGeometry args={[0.16, 0.14, 16]} />
+        <meshStandardMaterial color={FLAME_COLOR} emissive={FLAME_COLOR} emissiveIntensity={0.9} />
+      </mesh>
+      {animated && (
+        <group ref={smokeRef}>
+          {Array.from({ length: SMOKE_PUFFS }, (_, index) => (
+            <mesh key={index}>
+              <sphereGeometry args={[0.09, 10, 8]} />
+              <meshStandardMaterial color={SMOKE_COLOR} transparent opacity={0} depthWrite={false} />
+            </mesh>
+          ))}
+        </group>
+      )}
+    </group>
+  )
+}
+
 type RoomProps = {
   kitchenTickets: Order[]
   passPlates: Order[]
@@ -131,7 +201,8 @@ type RoomProps = {
 
 /**
  * Décor de la salle et de la cuisine. La cuisine montre les commandes validées
- * ou en préparation (tickets au-dessus du passe, fourneaux allumés), le passe
+ * ou en préparation (tickets au-dessus du passe, fourneaux allumés avec flamme et
+ * fumée), l'îlot de préparation est au centre, le passe
  * les commandes prêtes (une assiette par commande).
  */
 export function Room({ kitchenTickets, passPlates }: RoomProps) {
@@ -140,7 +211,7 @@ export function Room({ kitchenTickets, passPlates }: RoomProps) {
   return (
     <group>
       {/* Sol de la salle et de la cuisine */}
-      <mesh rotation-x={-Math.PI / 2} position-y={-0.01}>
+      <mesh rotation-x={-Math.PI / 2} position={[0, -0.01, ROOM.centerZ]}>
         <planeGeometry args={[ROOM.width, ROOM.depth]} />
         <meshStandardMaterial color="#e9dfcf" />
       </mesh>
@@ -150,11 +221,11 @@ export function Room({ kitchenTickets, passPlates }: RoomProps) {
       </mesh>
 
       {/* Murs du fond et de gauche, bas pour ne rien masquer en vue iso */}
-      <mesh position={[0, WALL_HEIGHT / 2, -ROOM.depth / 2 - WALL_THICKNESS / 2]}>
+      <mesh position={[0, WALL_HEIGHT / 2, ROOM.minZ - WALL_THICKNESS / 2]}>
         <boxGeometry args={[ROOM.width + WALL_THICKNESS * 2, WALL_HEIGHT, WALL_THICKNESS]} />
         <meshStandardMaterial color="#b0a597" />
       </mesh>
-      <mesh position={[-ROOM.width / 2 - WALL_THICKNESS / 2, WALL_HEIGHT / 2, 0]}>
+      <mesh position={[-ROOM.width / 2 - WALL_THICKNESS / 2, WALL_HEIGHT / 2, ROOM.centerZ]}>
         <boxGeometry args={[WALL_THICKNESS, WALL_HEIGHT, ROOM.depth]} />
         <meshStandardMaterial color="#b0a597" />
       </mesh>
@@ -170,19 +241,21 @@ export function Room({ kitchenTickets, passPlates }: RoomProps) {
         <KitchenFurniture />
       </WithFallback>
 
-      {/* Feux des fourneaux, allumés s'il y a des commandes en préparation */}
+      {/* Feux des fourneaux : un fourneau allumé par commande en préparation (trois au plus) */}
       {STOVES_X.map((x, index) => (
-        <mesh key={x} position={[x, COUNTER_HEIGHT + 0.01, KITCHEN_COUNTER_Z]}>
-          <cylinderGeometry args={[0.3, 0.3, 0.02, 24]} />
-          <meshStandardMaterial
-            color={index < cookingCount ? '#ef4444' : '#37474f'}
-            emissive={index < cookingCount ? '#f97316' : '#000000'}
-            emissiveIntensity={index < cookingCount ? 0.8 : 0}
-            transparent
-            opacity={index < cookingCount ? 0.9 : 0}
-          />
-        </mesh>
+        <StoveFire key={x} x={x} lit={index < cookingCount} />
       ))}
+
+      <WithFallback
+        fallback={
+          <mesh position={[PREP_ISLAND.x, PASS_HEIGHT / 2, PREP_ISLAND.z]}>
+            <boxGeometry args={[PREP_ISLAND.width, PASS_HEIGHT, PREP_ISLAND.depth]} />
+            <meshStandardMaterial color="#8d6e63" />
+          </mesh>
+        }
+      >
+        <IslandFurniture />
+      </WithFallback>
 
       <WithFallback
         fallback={

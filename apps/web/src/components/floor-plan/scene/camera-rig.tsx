@@ -33,8 +33,8 @@ const WALL_THICKNESS = 0.15
 
 // Boîtes englobantes cadrées : la pièce entière (cuisine comprise, murs inclus) et la cuisine avec le passe.
 const ROOM_BOUNDS: Bounds = {
-  min: [-ROOM.width / 2 - WALL_THICKNESS, 0, -ROOM.depth / 2 - WALL_THICKNESS],
-  max: [ROOM.width / 2, WALL_HEIGHT, ROOM.depth / 2],
+  min: [-ROOM.width / 2 - WALL_THICKNESS, 0, ROOM.minZ - WALL_THICKNESS],
+  max: [ROOM.width / 2, WALL_HEIGHT, ROOM.maxZ],
 }
 const KITCHEN_BOUNDS: Bounds = {
   min: [KITCHEN.x - KITCHEN.width / 2, 0, KITCHEN.z - KITCHEN.depth / 2 - WALL_THICKNESS],
@@ -56,8 +56,8 @@ const TOP_HEADER_INSET = 72
 // y = 0 désynchroniserait la salle et le curseur. La marge horizontale laisse
 // décentrer une table de bord à côté du panneau.
 const TARGET_BOUNDARY = new Box3(
-  new Vector3(-ROOM.width / 2 - 4, -ROOM.depth, -ROOM.depth / 2 - 4),
-  new Vector3(ROOM.width / 2 + 4, ROOM.depth, ROOM.depth / 2 + 4),
+  new Vector3(-ROOM.width / 2 - 4, -ROOM.depth, ROOM.minZ - 4),
+  new Vector3(ROOM.width / 2 + 4, ROOM.depth, ROOM.maxZ + 4),
 )
 
 const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -112,7 +112,7 @@ export function CameraRig({ mode, shot, panel, topInsetLeft = 0, resetSignal, en
   )
   const topCenterX = -topInset / 2 / topZoom
   // Vers -z (le haut de l'écran) : la salle descend sous la barre flottante.
-  const topCenterZ = -TOP_HEADER_INSET / 2 / topZoom
+  const topCenterZ = ROOM.centerZ - TOP_HEADER_INSET / 2 / topZoom
 
   useEffect(() => {
     const controls = controlsRef.current

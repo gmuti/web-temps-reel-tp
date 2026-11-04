@@ -7,7 +7,7 @@ import {
   type TableState,
   type UserRole,
 } from '@app/shared'
-import { FRONT_AISLE_Z, DINING_AISLES_Z, KITCHEN_WALK_Z, PASS_COUNTER, ROOM } from './floor-plan-data'
+import { COOK_STATIONS, DINING_AISLES_Z, FRONT_AISLE_Z, KITCHEN_WALK_Z, PASS_COUNTER, ROOM } from './floor-plan-data'
 
 /**
  * État visuel d'une table : d'abord celui de sa commande la plus urgente, sinon
@@ -129,10 +129,11 @@ export function buildScene(
 
 export type StaffZone = 'kitchen' | 'floor' | 'office'
 
-export type StaffView = { user: ChatAuthor; zone: StaffZone; x: number; z: number }
+// `station` : rang du poste d'un cuisinier (cf. COOK_STATIONS), null pour les autres rôles.
+export type StaffView = { user: ChatAuthor; zone: StaffZone; x: number; z: number; station: number | null }
 
 // Où se tient chaque rôle, toujours sur une allée (cf. staff-routes.ts) :
-// cuisiniers entre le plan de travail et le passe, serveurs côté salle devant
+// chaque cuisinier à son poste (fourneau, puis îlot), serveurs côté salle devant
 // le passe, responsables et managers à l'entrée.
 const ZONE_OF_ROLE: Record<UserRole, StaffZone> = {
   COOK: 'kitchen',
@@ -142,7 +143,7 @@ const ZONE_OF_ROLE: Record<UserRole, StaffZone> = {
 }
 
 const ZONE_ORIGIN: Record<StaffZone, { x: number; z: number; step: number }> = {
-  kitchen: { x: -2.4, z: KITCHEN_WALK_Z, step: 1.2 },
+  kitchen: { x: -5.5, z: KITCHEN_WALK_Z, step: -0.8 },
   floor: { x: PASS_COUNTER.x + PASS_COUNTER.width / 2 + 0.8, z: FRONT_AISLE_Z, step: 0.8 },
   office: { x: ROOM.width / 2 - 1, z: DINING_AISLES_Z[DINING_AISLES_Z.length - 1], step: -0.8 },
 }
@@ -158,6 +159,9 @@ export function placeStaff(online: readonly ChatAuthor[]): StaffView[] {
     const zone = ZONE_OF_ROLE[user.role]
     const origin = ZONE_ORIGIN[zone]
     const index = placed[zone]++
-    return { user, zone, x: origin.x + index * origin.step, z: origin.z }
+    const station = zone === 'kitchen' ? COOK_STATIONS[index] : undefined
+    // Plus de cuisiniers que de postes : les suivants attendent côte à côte devant le passe.
+    if (zone === 'kitchen' && station) return { user, zone, x: station.x, z: station.z, station: index }
+    return { user, zone, x: origin.x + index * origin.step, z: origin.z, station: null }
   })
 }

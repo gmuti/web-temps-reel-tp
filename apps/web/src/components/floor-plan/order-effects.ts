@@ -8,9 +8,11 @@ import {
 import {
   COUNTER_HEIGHT,
   KITCHEN_COUNTER_Z,
+  KITCHEN_WALK_Z,
   PASS_COUNTER,
   PASS_HEIGHT,
   TICKET_RAIL_Y,
+  STOVES_X,
   TICKET_RAIL_Z,
 } from './floor-plan-data'
 import { TABLE_STATE_STYLES } from './table-states'
@@ -33,9 +35,10 @@ const CANCELLED_COLOR = '#ef4444'
 
 const RAIL: Vec3 = [PASS_COUNTER.x, TICKET_RAIL_Y, TICKET_RAIL_Z]
 const PASS_TOP: Vec3 = [PASS_COUNTER.x, PASS_HEIGHT + 0.05, PASS_COUNTER.z]
-const STOVE_TOP: Vec3 = [PASS_COUNTER.x, COUNTER_HEIGHT + 0.05, KITCHEN_COUNTER_Z]
-// Sol de la cuisine, entre le plan de travail et le passe.
-const KITCHEN_FLOOR: Vec3 = [PASS_COUNTER.x, 0.02, (KITCHEN_COUNTER_Z + PASS_COUNTER.z) / 2]
+// Fourneau du milieu, contre le mur du fond.
+const STOVE_TOP: Vec3 = [STOVES_X[1], COUNTER_HEIGHT + 0.05, KITCHEN_COUNTER_Z]
+// Sol de la cuisine, dans l'allée entre l'îlot et le passe.
+const KITCHEN_FLOOR: Vec3 = [PASS_COUNTER.x, 0.02, KITCHEN_WALK_Z]
 
 /**
  * Effet correspondant à un événement de commande. `ordersBefore` est l'état
@@ -96,8 +99,9 @@ export function effectOfEvent(
   }
 }
 
-// Une table débarrassée redevient disponible : vert, plutôt que le gris discret de « libre ».
-const TABLE_FREED_COLOR = '#10b981'
+// Une table débarrassée redevient libre : même gris que l'état « libre » (handoff § 6.4),
+// le vert se confondait avec « Prête ».
+const TABLE_FREED_COLOR = TABLE_STATE_STYLES.free.color
 
 const OCCUPANCY_PULSE_COLOR: Record<TableStatusUpdatedEvent['status'], string> = {
   OCCUPEE: TABLE_STATE_STYLES.occupied.color,

@@ -1,6 +1,16 @@
 import type { FloorTable, Order, OrderJournalEvent } from '@app/shared'
 import { describe, expect, it } from 'vitest'
-import { CORRIDOR_X, DINING_AISLES_Z, FRONT_AISLE_Z, KITCHEN_DOOR_X, KITCHEN_WALK_Z } from './floor-plan-data'
+import {
+  COOK_STATIONS,
+  CORRIDOR_X,
+  DINING_AISLES_Z,
+  FRONT_AISLE_Z,
+  ISLAND_SIDE_X,
+  KITCHEN_DOOR_X,
+  KITCHEN_WALK_Z,
+  PREP_ISLAND,
+  STOVE_WALK_Z,
+} from './floor-plan-data'
 import {
   destinationsOf,
   DWELL_MS,
@@ -21,7 +31,7 @@ const ORDER_ID = '00000000-0000-4000-8000-000000000001'
 const date = new Date(Date.UTC(2026, 10, 3, 12, 0))
 
 const waiterHome: Point = { x: 4.3, z: FRONT_AISLE_Z }
-const cookHome: Point = { x: -2.4, z: KITCHEN_WALK_Z }
+const cookHome: Point = { x: COOK_STATIONS[0].x, z: COOK_STATIONS[0].z }
 
 // Chaque déplacement d'un itinéraire suit un seul axe (allées et couloir).
 const isAxisAligned = (route: Point[]) =>
@@ -48,6 +58,23 @@ describe('routeBetween', () => {
     expect(route).toContainEqual({ x: KITCHEN_DOOR_X, z: KITCHEN_WALK_Z })
     expect(route).toContainEqual({ x: KITCHEN_DOOR_X, z: FRONT_AISLE_Z })
     expect(isAxisAligned(route)).toBe(true)
+  })
+
+  it('contourne l’îlot pour aller du fourneau au passe', () => {
+    const route = routeBetween(cookHome, { x: 0, z: KITCHEN_WALK_Z })
+    expect(route).toContainEqual({ x: -ISLAND_SIDE_X, z: STOVE_WALK_Z })
+    expect(route).toContainEqual({ x: -ISLAND_SIDE_X, z: KITCHEN_WALK_Z })
+    expect(isAxisAligned(route)).toBe(true)
+    // Aucun déplacement vertical ne traverse l'emprise de l'îlot.
+    const crossesIsland = route.some(
+      (point, index) =>
+        index > 0 &&
+        point.x === route[index - 1].x &&
+        Math.abs(point.x - PREP_ISLAND.x) < PREP_ISLAND.width / 2 &&
+        Math.min(point.z, route[index - 1].z) < PREP_ISLAND.z &&
+        Math.max(point.z, route[index - 1].z) > PREP_ISLAND.z,
+    )
+    expect(crossesIsland).toBe(false)
   })
 
   it('emprunte uniquement des allées connues entre deux tables', () => {
@@ -111,10 +138,9 @@ describe('destinationsOf', () => {
     ])
   })
 
-  it('garde le cuisinier en cuisine', () => {
-    const [stove] = destinationsOf(statusUpdated('EN_PREPARATION'), 'COOK', TABLES, [order])
+  it('garde le cuisinier à son poste pour cuisiner, et l’envoie au passe quand c’est prêt', () => {
+    expect(destinationsOf(statusUpdated('EN_PREPARATION'), 'COOK', TABLES, [order])).toEqual([])
     const [pass] = destinationsOf(statusUpdated('PRETE'), 'COOK', TABLES, [order])
-    expect(stove.z).toBeLessThan(KITCHEN_WALK_Z)
     expect(pass).toEqual({ x: 0, z: KITCHEN_WALK_Z })
   })
 

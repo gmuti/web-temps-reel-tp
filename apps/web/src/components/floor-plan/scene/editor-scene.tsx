@@ -4,7 +4,8 @@ import { useEffect, useRef } from 'react'
 import { ROOM } from '../floor-plan-data'
 import { TableFurniture } from './dining-table'
 
-const SELECTED_COLOR = '#2563eb'
+// Sélection en noir : pas de bleu de marque ou d'état dans la scène (handoff § 3.1).
+const SELECTED_COLOR = '#101010'
 const FAULTY_COLOR = '#dc2626'
 const FOOTPRINT_COLOR = '#94a3b8'
 

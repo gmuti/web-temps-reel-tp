@@ -10,10 +10,12 @@ import {
   CORRIDOR_X,
   DINING_AISLES_Z,
   FRONT_AISLE_Z,
-  KITCHEN_COUNTER_Z,
+  ISLAND_SIDE_X,
   KITCHEN_DOOR_X,
   KITCHEN_WALK_Z,
   PASS_COUNTER,
+  PREP_ISLAND,
+  STOVE_WALK_Z,
   TABLE_SIZE,
 } from './floor-plan-data'
 
@@ -38,19 +40,36 @@ const isKitchen = (point: Point) => point.z < PASS_COUNTER.z - 0.3
 const nearestAisle = (z: number) =>
   DINING_AISLES_Z.reduce((best, aisle) => (Math.abs(aisle - z) < Math.abs(best - z) ? aisle : best))
 
+// Allée de cuisine d'un point : devant les fourneaux (derrière l'îlot) ou entre l'îlot et le passe.
+const kitchenLaneOf = (point: Point) => (point.z < PREP_ISLAND.z ? STOVE_WALK_Z : KITCHEN_WALK_Z)
+
+// Trajet en cuisine de `from` à `to` (exclu `from`) : on change d'allée par le côté de l'îlot.
+function kitchenPath(from: Point, to: Point): Point[] {
+  const fromLane = kitchenLaneOf(from)
+  const toLane = kitchenLaneOf(to)
+  const points: Point[] = [{ x: from.x, z: fromLane }]
+  if (fromLane !== toLane) {
+    const sideX = (from.x >= PREP_ISLAND.x ? 1 : -1) * ISLAND_SIDE_X
+    points.push({ x: sideX, z: fromLane }, { x: sideX, z: toLane })
+  }
+  points.push({ x: to.x, z: toLane }, to)
+  return points
+}
+
+const KITCHEN_DOOR: Point = { x: KITCHEN_DOOR_X, z: KITCHEN_WALK_Z }
+
 /** Itinéraire de `from` à `to` par les allées, extrémités comprises. */
 export function routeBetween(from: Point, to: Point): Point[] {
   const points: Point[] = [from]
   let aisle: number
 
   if (isKitchen(from)) {
-    points.push({ x: from.x, z: KITCHEN_WALK_Z })
     if (isKitchen(to)) {
-      points.push({ x: to.x, z: KITCHEN_WALK_Z }, to)
+      points.push(...kitchenPath(from, to))
       return dedupe(points)
     }
     // Sortie de la cuisine par le bout du passe, vers l'allée devant le passe.
-    points.push({ x: KITCHEN_DOOR_X, z: KITCHEN_WALK_Z }, { x: KITCHEN_DOOR_X, z: FRONT_AISLE_Z })
+    points.push(...kitchenPath(from, KITCHEN_DOOR), { x: KITCHEN_DOOR_X, z: FRONT_AISLE_Z })
     aisle = FRONT_AISLE_Z
   } else {
     aisle = nearestAisle(from.z)
@@ -62,12 +81,7 @@ export function routeBetween(from: Point, to: Point): Point[] {
     points.push({ x: CORRIDOR_X, z: aisle }, { x: CORRIDOR_X, z: targetAisle })
   }
   if (isKitchen(to)) {
-    points.push(
-      { x: KITCHEN_DOOR_X, z: FRONT_AISLE_Z },
-      { x: KITCHEN_DOOR_X, z: KITCHEN_WALK_Z },
-      { x: to.x, z: KITCHEN_WALK_Z },
-      to,
-    )
+    points.push({ x: KITCHEN_DOOR_X, z: FRONT_AISLE_Z }, ...kitchenPath(KITCHEN_DOOR, to))
   } else {
     points.push({ x: to.x, z: targetAisle }, to)
   }
@@ -89,7 +103,6 @@ export function standAt(table: FloorTable): Point {
 
 const PASS_FRONT: Point = { x: PASS_COUNTER.x, z: FRONT_AISLE_Z }
 const PASS_BACK: Point = { x: PASS_COUNTER.x, z: KITCHEN_WALK_Z }
-const STOVE_FRONT: Point = { x: -4.3, z: KITCHEN_COUNTER_Z + 0.8 }
 
 /**
  * Lieux où se rend l'auteur d'un événement, dans l'ordre (une commande servie :
@@ -114,8 +127,9 @@ export function destinationsOf(
 
   const inKitchen = actorRole === 'COOK'
   switch (entry.event.status) {
+    // Le cuisinier prend la commande à son poste (fourneau) : il ne se déplace pas.
     case 'EN_PREPARATION':
-      return [inKitchen ? STOVE_FRONT : PASS_FRONT]
+      return inKitchen ? [] : [PASS_FRONT]
     case 'PRETE':
       return [inKitchen ? PASS_BACK : PASS_FRONT]
     case 'SERVIE':
